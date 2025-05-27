@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+body {
+  font-family: 'Quicksand', sans-serif;
+}
+
+.font-comic {
+  font-family: 'Comic Neue', cursive;
+}
+
+.font-patrick {
+  font-family: 'Patrick Hand', cursive;
+}
+
+/* Mobile message input styles */
+@media (max-width: 768px) {
+  .message-input-container {
+    position: relative;
+  }
+  
+  .message-tools-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 0.75rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-around;
+  }
+}

@@ -14,13 +14,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-export const createChatRoom = async (roomName: string, createdBy: string) => {
+export const createChatRoom = async (roomData: {
+  name: string;
+  createdBy: string;
+  isPrivate: boolean;
+  password?: string;
+}) => {
   const chatRoomsRef = ref(database, 'chatRooms');
   const newRoomRef = push(chatRoomsRef);
   
   await set(newRoomRef, {
-    name: roomName,
-    createdBy,
+    ...roomData,
     createdAt: serverTimestamp(),
   });
   

@@ -4,7 +4,7 @@ import { sendMessage, sendVoiceNote, deleteVoiceNote } from '../services/firebas
 import { uploadImage } from '../utils/imgbb';
 import { MessageType } from '../utils/types';
 import { saveVoiceNote } from '../utils/storage';
-import { Send, Image, Mic, MicOff, Smile } from 'lucide-react';
+import { Send, Image, Mic, MicOff, Smile, MoreHorizontal } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
 
@@ -23,6 +23,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useUser();
   
@@ -98,6 +99,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setMessage(prev => prev + emojiData.emoji);
     setShowEmojiPicker(false);
+    setShowTools(false);
   };
 
   const toggleRecording = () => {
@@ -108,6 +110,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
       recorderControls.startRecording();
       setIsRecording(true);
     }
+    setShowTools(false);
   };
 
   const addAudioElement = async (blob: Blob) => {
@@ -156,7 +159,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+    <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 message-input-container font-comic">
       {replyTo && (
         <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-center">
           <div className="flex-1">
@@ -196,42 +199,54 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         </div>
         
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
-            aria-label="Add emoji"
-          >
-            <Smile size={20} />
-          </button>
-          
-          <div className="relative">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-              id="image-upload"
-              disabled={isUploading}
-            />
-            <label
-              htmlFor="image-upload"
-              className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              aria-label="Upload image"
+          <div className="md:flex hidden items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+              aria-label="Add emoji"
             >
-              <Image size={20} />
-            </label>
+              <Smile size={20} />
+            </button>
+            
+            <div className="relative">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                id="image-upload"
+                disabled={isUploading}
+              />
+              <label
+                htmlFor="image-upload"
+                className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                aria-label="Upload image"
+              >
+                <Image size={20} />
+              </label>
+            </div>
+            
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`p-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400'}`}
+              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+            >
+              {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
+            </button>
           </div>
           
-          <button
-            type="button"
-            onClick={toggleRecording}
-            className={`p-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400'}`}
-            aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-          >
-            {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
-          </button>
+          <div className="md:hidden">
+            <button
+              type="button"
+              onClick={() => setShowTools(!showTools)}
+              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+          </div>
           
           <button
             type="submit"
@@ -243,6 +258,39 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           </button>
         </div>
       </form>
+      
+      {showTools && (
+        <div className="message-tools-dropdown">
+          <button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+          >
+            <Smile size={24} />
+          </button>
+          
+          <label
+            htmlFor="image-upload-mobile"
+            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+          >
+            <Image size={24} />
+            <input
+              id="image-upload-mobile"
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+              disabled={isUploading}
+            />
+          </label>
+          
+          <button
+            onClick={toggleRecording}
+            className={`p-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400'}`}
+          >
+            {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+          </button>
+        </div>
+      )}
       
       {showEmojiPicker && (
         <div className="absolute bottom-20 right-4 z-10">

@@ -10,6 +10,8 @@ export interface ChatRoom {
   name: string;
   createdBy: string;
   createdAt: number;
+  isPrivate: boolean;
+  password?: string;
 }
 
 export enum MessageType {
