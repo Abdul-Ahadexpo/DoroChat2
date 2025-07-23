@@ -19,16 +19,45 @@ export const createChatRoom = async (roomData: {
   createdBy: string;
   isPrivate: boolean;
   password?: string;
+  isTemporary: boolean;
+  permanentCode?: string;
 }) => {
   const chatRoomsRef = ref(database, 'chatRooms');
   const newRoomRef = push(chatRoomsRef);
   
-  await set(newRoomRef, {
+  const roomInfo = {
     ...roomData,
     createdAt: serverTimestamp(),
-  });
+    ...(roomData.isTemporary && !roomData.permanentCode && {
+      expiresAt: Date.now() + (8 * 60 * 60 * 1000) // 8 hours from now
+    })
+  };
+  
+  await set(newRoomRef, roomInfo);
   
   return newRoomRef.key;
+};
+
+export const updateChatRoom = async (roomId: string, updates: any) => {
+  const roomRef = ref(database, `chatRooms/${roomId}`);
+  await update(roomRef, updates);
+};
+
+export const cleanupExpiredRooms = async () => {
+  const chatRoomsRef = ref(database, 'chatRooms');
+  const snapshot = await get(chatRoomsRef);
+  
+  if (snapshot.exists()) {
+    const rooms = snapshot.val();
+    const now = Date.now();
+    
+    for (const [roomId, room] of Object.entries(rooms)) {
+      const roomData = room as any;
+      if (roomData.isTemporary && roomData.expiresAt && now > roomData.expiresAt) {
+        await deleteRoom(roomId);
+      }
+    }
+  }
 };
 
 export const deleteRoom = async (roomId: string) => {
@@ -67,6 +96,20 @@ export const sendMessage = async (roomId: string, message: any) => {
   return newMessageRef.key;
 };
 
+export const editMessage = async (roomId: string, messageId: string, newContent: string) => {
+  const messageRef = ref(database, `messages/${roomId}/${messageId}`);
+  
+  await update(messageRef, {
+    content: newContent,
+    editedAt: serverTimestamp(),
+  });
+};
+
+export const deleteMessage = async (roomId: string, messageId: string) => {
+  const messageRef = ref(database, `messages/${roomId}/${messageId}`);
+  await remove(messageRef);
+};
+
 export const getMessages = (roomId: string, callback: (messages: any[]) => void) => {
   const messagesRef = ref(database, `messages/${roomId}`);
   
@@ -103,6 +146,8 @@ export default {
   createChatRoom,
   getChatRooms,
   sendMessage,
+  editMessage,
+  deleteMessage,
   getMessages,
   sendVoiceNote,
   deleteVoiceNote,

@@ -12,6 +12,9 @@ export interface ChatRoom {
   createdAt: number;
   isPrivate: boolean;
   password?: string;
+  isTemporary: boolean;
+  expiresAt?: number;
+  permanentCode?: string;
 }
 
 export enum MessageType {
@@ -29,6 +32,7 @@ export interface Message {
   content: string;
   type: MessageType;
   timestamp: number;
+  editedAt?: number;
   replyTo?: {
     id: string;
     content: string;

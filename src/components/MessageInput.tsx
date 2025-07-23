@@ -4,7 +4,7 @@ import { sendMessage, sendVoiceNote, deleteVoiceNote } from '../services/firebas
 import { uploadImage } from '../utils/imgbb';
 import { MessageType } from '../utils/types';
 import { saveVoiceNote } from '../utils/storage';
-import { Send, Image, Mic, MicOff, Smile, MoreHorizontal } from 'lucide-react';
+import { Send, Image, Mic, MicOff, Smile, MoreHorizontal, X } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
 
@@ -25,9 +25,18 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
   
   const recorderControls = useAudioRecorder();
+
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +59,9 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
       });
       
       setMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
       if (onCancelReply) onCancelReply();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -66,6 +78,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     }
     
     setIsUploading(true);
+    setShowTools(false);
     
     uploadImage(file)
       .then(async (imageUrl) => {
@@ -100,6 +113,10 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     setMessage(prev => prev + emojiData.emoji);
     setShowEmojiPicker(false);
     setShowTools(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      adjustTextareaHeight();
+    }
   };
 
   const toggleRecording = () => {
@@ -159,20 +176,20 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 message-input-container font-comic">
+    <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2 md:p-4 message-input-container font-comic">
       {replyTo && (
         <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex justify-between items-center">
-          <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
               Replying to {replyTo.senderName}
             </p>
-            <p className="text-sm truncate">{replyTo.content}</p>
+            <p className="text-xs md:text-sm truncate">{replyTo.content}</p>
           </div>
           <button
             onClick={onCancelReply}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 ml-2 p-1"
           >
-            ×
+            <X size={16} />
           </button>
         </div>
       )}
@@ -180,13 +197,17 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
       <form onSubmit={handleSendMessage} className="flex items-end gap-2">
         <div className="relative flex-1">
           <textarea
+            ref={textareaRef}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              adjustTextareaHeight();
+            }}
             placeholder="Type a message..."
-            className="w-full p-3 pr-24 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 dark:bg-gray-700 dark:text-white resize-none"
+            className="w-full p-2 md:p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 dark:bg-gray-700 dark:text-white resize-none text-sm md:text-base"
             rows={1}
             style={{ 
-              minHeight: '44px', 
+              minHeight: '40px', 
               maxHeight: '120px'
             }}
             onKeyDown={(e) => {
@@ -198,12 +219,13 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           />
         </div>
         
-        <div className="flex items-center gap-2">
-          <div className="md:flex hidden items-center gap-2">
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Desktop tools */}
+          <div className="hidden md:flex items-center gap-1">
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               aria-label="Add emoji"
             >
               <Smile size={20} />
@@ -221,7 +243,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
               />
               <label
                 htmlFor="image-upload"
-                className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label="Upload image"
               >
                 <Image size={20} />
@@ -231,18 +253,19 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
             <button
               type="button"
               onClick={toggleRecording}
-              className={`p-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400'}`}
+              className={`p-2 rounded-full transition-colors ${isRecording ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-900/20' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
               aria-label={isRecording ? 'Stop recording' : 'Start recording'}
             >
               {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
           </div>
           
+          {/* Mobile tools button */}
           <div className="md:hidden">
             <button
               type="button"
               onClick={() => setShowTools(!showTools)}
-              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+              className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <MoreHorizontal size={20} />
             </button>
@@ -251,26 +274,30 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           <button
             type="submit"
             disabled={message.trim() === '' || isUploading}
-            className={`bg-violet-600 hover:bg-violet-700 text-white p-3 rounded-lg transition-colors ${(message.trim() === '' || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`bg-violet-600 hover:bg-violet-700 text-white p-2 md:p-3 rounded-full transition-colors ${(message.trim() === '' || isUploading) ? 'opacity-50 cursor-not-allowed' : 'shadow-lg hover:shadow-xl'}`}
             aria-label="Send message"
           >
-            <Send size={20} />
+            <Send size={18} />
           </button>
         </div>
       </form>
       
+      {/* Mobile tools dropdown */}
       {showTools && (
         <div className="message-tools-dropdown">
           <button
-            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+            onClick={() => {
+              setShowEmojiPicker(!showEmojiPicker);
+              setShowTools(false);
+            }}
+            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <Smile size={24} />
           </button>
           
           <label
             htmlFor="image-upload-mobile"
-            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-2"
+            className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
           >
             <Image size={24} />
             <input
@@ -285,19 +312,27 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           
           <button
             onClick={toggleRecording}
-            className={`p-2 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400'}`}
+            className={`p-3 rounded-full transition-colors ${isRecording ? 'text-red-500 animate-pulse bg-red-50 dark:bg-red-900/20' : 'text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
           >
             {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
           </button>
         </div>
       )}
       
+      {/* Emoji picker */}
       {showEmojiPicker && (
-        <div className="absolute bottom-20 right-4 z-10">
-          <EmojiPicker onEmojiClick={handleEmojiClick} />
+        <div className="absolute bottom-16 md:bottom-20 right-2 md:right-4 z-50">
+          <div className="relative">
+            <EmojiPicker 
+              onEmojiClick={handleEmojiClick}
+              width={280}
+              height={350}
+            />
+          </div>
         </div>
       )}
       
+      {/* Hidden audio recorder */}
       <div className="hidden">
         <AudioRecorder 
           onRecordingComplete={addAudioElement}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Play, Pause, Volume2 } from 'lucide-react';
+import { Play, Pause, Volume2, Download } from 'lucide-react';
 import { getVoiceNote } from '../utils/storage';
 
 interface VoiceNotePlayerProps {
@@ -85,6 +85,22 @@ const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({ roomId, voiceNoteId, 
     audio.currentTime = value;
   };
 
+  const downloadVoiceNote = () => {
+    if (!audioSrc) return;
+    
+    try {
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = audioSrc;
+      a.download = `voice-note-${Date.now()}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading voice note:', error);
+    }
+  };
+
   // Format time as mm:ss
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -93,7 +109,7 @@ const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({ roomId, voiceNoteId, 
   };
 
   return (
-    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-2 w-64 max-w-full">
+    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-2 w-full max-w-xs md:max-w-sm">
       {audioSrc && <audio ref={audioRef} src={audioSrc} preload="metadata" />}
       
       <button
@@ -101,10 +117,10 @@ const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({ roomId, voiceNoteId, 
         className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-violet-600 hover:bg-violet-700 text-white rounded-full mr-2"
         aria-label={isPlaying ? "Pause" : "Play"}
       >
-        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
       </button>
       
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <input
           type="range"
           min="0"
@@ -123,7 +139,16 @@ const VoiceNotePlayer: React.FC<VoiceNotePlayerProps> = ({ roomId, voiceNoteId, 
         </div>
       </div>
       
-      <Volume2 size={16} className="text-gray-500 dark:text-gray-400 ml-2" />
+      <div className="flex items-center ml-2 space-x-1">
+        <Volume2 size={14} className="text-gray-500 dark:text-gray-400" />
+        <button
+          onClick={downloadVoiceNote}
+          className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-1"
+          aria-label="Download voice note"
+        >
+          <Download size={14} />
+        </button>
+      </div>
     </div>
   );
 };

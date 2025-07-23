@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Message, MessageType } from '../utils/types';
+import { useUser } from '../contexts/UserContext';
+import { editMessage, deleteMessage } from '../services/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import ImageMessage from './ImageMessage';
-import { Reply } from 'lucide-react';
+import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -16,6 +18,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [showMenu, setShowMenu] = useState<string | null>(null);
+  const { user } = useUser();
 
   useEffect(() => {
     if (autoScroll && messagesEndRef.current) {
@@ -54,10 +60,43 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleEditMessage = async (messageId: string) => {
+    if (editContent.trim() === '') return;
+    
+    try {
+      await editMessage(roomId, messageId, editContent.trim());
+      setEditingMessage(null);
+      setEditContent('');
+    } catch (error) {
+      console.error('Error editing message:', error);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      try {
+        await deleteMessage(roomId, messageId);
+      } catch (error) {
+        console.error('Error deleting message:', error);
+      }
+    }
+  };
+
+  const startEditing = (message: Message) => {
+    setEditingMessage(message.id);
+    setEditContent(message.content);
+    setShowMenu(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessage(null);
+    setEditContent('');
+  };
+
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900"
+      className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4 bg-gray-50 dark:bg-gray-900"
     >
       {Object.keys(groupedMessages).length === 0 && (
         <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
@@ -67,9 +106,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       )}
       
       {Object.entries(groupedMessages).map(([date, dateMessages]) => (
-        <div key={date} className="space-y-2">
+        <div key={date} className="space-y-1 md:space-y-2">
           <div className="flex justify-center">
-            <div className="bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300">
+            <div className="bg-gray-200 dark:bg-gray-700 px-2 md:px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300">
               {date}
             </div>
           </div>
@@ -77,54 +116,126 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
           {dateMessages.map((message) => (
             <div key={message.id} className="flex flex-col">
               <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline space-x-2">
+                <div className="flex items-baseline space-x-1 md:space-x-2">
                   <span 
-                    className={`font-medium ${message.senderFontStyle}`}
+                    className={`font-medium text-sm md:text-base ${message.senderFontStyle}`}
                     style={{ color: message.senderColor }}
                   >
                     {message.senderName}
                   </span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {formatTime(message.timestamp)}
+                    {message.editedAt && (
+                      <span className="ml-1 text-gray-400">(edited)</span>
+                    )}
                   </span>
                 </div>
-                <button
-                  onClick={() => onReply(message)}
-                  className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400"
-                  aria-label="Reply to message"
-                >
-                  <Reply size={16} />
-                </button>
+                
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => onReply(message)}
+                    className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-1"
+                    aria-label="Reply to message"
+                  >
+                    <Reply size={14} />
+                  </button>
+                  
+                  {message.senderId === user.id && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowMenu(showMenu === message.id ? null : message.id)}
+                        className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-1"
+                        aria-label="Message options"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                      
+                      {showMenu === message.id && (
+                        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[120px]">
+                          {message.type === MessageType.TEXT && (
+                            <button
+                              onClick={() => startEditing(message)}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            >
+                              <Edit size={14} />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteMessage(message.id)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2 text-red-600"
+                          >
+                            <Trash2 size={14} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               
               {message.replyTo && (
-                <div className="ml-4 mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded border-l-2 border-violet-500">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="ml-2 md:ml-4 mt-1 p-2 bg-gray-100 dark:bg-gray-800 rounded border-l-2 border-violet-500">
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
                     Replying to {message.replyTo.senderName}
                   </p>
-                  <p className="text-sm truncate">{message.replyTo.content}</p>
+                  <p className="text-xs md:text-sm truncate">{message.replyTo.content}</p>
                 </div>
               )}
               
               <div className="mt-1 ml-1">
-                {message.type === MessageType.TEXT && (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {message.content}
-                    </ReactMarkdown>
+                {editingMessage === message.id ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-700 dark:text-white"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleEditMessage(message.id);
+                        } else if (e.key === 'Escape') {
+                          cancelEditing();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleEditMessage(message.id)}
+                      className="text-green-600 hover:text-green-700 p-1"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={cancelEditing}
+                      className="text-red-600 hover:text-red-700 p-1"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                )}
-                
-                {message.type === MessageType.IMAGE && (
-                  <ImageMessage imageUrl={message.content} />
-                )}
-                
-                {message.type === MessageType.VOICE && (
-                  <VoiceNotePlayer 
-                    roomId={roomId}
-                    voiceNoteId={message.id}
-                    audioUrl={message.content}
-                  />
+                ) : (
+                  <>
+                    {message.type === MessageType.TEXT && (
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm md:text-base">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                    
+                    {message.type === MessageType.IMAGE && (
+                      <ImageMessage imageUrl={message.content} />
+                    )}
+                    
+                    {message.type === MessageType.VOICE && (
+                      <VoiceNotePlayer 
+                        roomId={roomId}
+                        voiceNoteId={message.id}
+                        audioUrl={message.content}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -140,10 +251,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             setAutoScroll(true);
           }}
-          className="fixed bottom-24 right-8 bg-violet-600 text-white rounded-full p-2 shadow-lg hover:bg-violet-700 transition-colors"
+          className="fixed bottom-20 md:bottom-24 right-4 md:right-8 bg-violet-600 text-white rounded-full p-2 md:p-3 shadow-lg hover:bg-violet-700 transition-colors z-10"
           aria-label="Scroll to bottom"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
