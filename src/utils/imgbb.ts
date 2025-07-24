@@ -6,7 +6,7 @@ export const uploadImage = async (imageFile: File): Promise<string> => {
   try {
     // Add timeout to prevent hanging uploads
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 360000); // 100 second timeout
     
     const formData = new FormData();
     formData.append('key', IMGBB_API_KEY);
