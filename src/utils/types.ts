@@ -15,6 +15,7 @@ export interface ChatRoom {
   isTemporary: boolean;
   expiresAt?: number;
   permanentCode?: string;
+  isHidden?: boolean;
 }
 
 export enum MessageType {

@@ -21,11 +21,14 @@ interface MessageInputProps {
 const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelReply }) => {
   const [message, setMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showTools, setShowTools] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useUser();
   
   const recorderControls = useAudioRecorder();
@@ -78,10 +81,19 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     }
     
     setIsUploading(true);
+    setUploadProgress(0);
     setShowTools(false);
+    
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        return Math.min(prev + Math.random() * 15, 95);
+      });
+    }, 200);
     
     uploadImage(file)
       .then(async (imageUrl) => {
+        setUploadProgress(100);
         await sendMessage(roomId, {
           senderId: user.id,
           senderName: user.name,
@@ -98,10 +110,12 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
       })
       .catch((error) => {
         console.error('Error uploading image:', error);
-        alert('Failed to upload image');
+        alert(`Failed to upload image: ${error.message}`);
       })
       .finally(() => {
+        clearInterval(progressInterval);
         setIsUploading(false);
+        setUploadProgress(0);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -123,15 +137,29 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     if (recorderControls.isRecording) {
       recorderControls.stopRecording();
       setIsRecording(false);
+      setRecordingTime(0);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
     } else {
       recorderControls.startRecording();
       setIsRecording(true);
+      setRecordingTime(0);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
     }
     setShowTools(false);
   };
 
   const addAudioElement = async (blob: Blob) => {
     setIsRecording(false);
+    setRecordingTime(0);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
     
     const reader = new FileReader();
     reader.readAsDataURL(blob);
@@ -175,6 +203,12 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     };
   };
 
+  const formatRecordingTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2 md:p-4 message-input-container font-comic">
       {replyTo && (
@@ -191,6 +225,40 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           >
             <X size={16} />
           </button>
+        </div>
+      )}
+      
+      {/* Upload Progress Bar */}
+      {isUploading && (
+        <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm text-blue-600 dark:text-blue-400">Uploading image...</span>
+            <span className="text-sm text-blue-600 dark:text-blue-400">{Math.round(uploadProgress)}%</span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+      
+      {/* Recording Timeline */}
+      {isRecording && (
+        <div className="mb-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-red-600 dark:text-red-400 font-medium">Recording...</span>
+            </div>
+            <span className="text-lg font-mono text-red-600 dark:text-red-400 font-bold">
+              {formatRecordingTime(recordingTime)}
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-red-500 dark:text-red-400">
+            Tap the mic button again to stop recording
+          </div>
         </div>
       )}
       

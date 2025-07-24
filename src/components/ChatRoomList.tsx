@@ -135,11 +135,23 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({ onRoomSelect, selectedRoomI
     }
   };
 
+  const toggleRoomVisibility = async (room: ChatRoom) => {
+    try {
+      await updateChatRoom(room.id, { isHidden: !room.isHidden });
+    } catch (error) {
+      console.error('Error toggling room visibility:', error);
+    }
+  };
+
   const filteredRooms = rooms.filter(room => 
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   ).filter(room => {
     // Filter out expired temporary rooms
     if (room.isTemporary && room.expiresAt && Date.now() > room.expiresAt) {
+      return false;
+    }
+    // Filter out hidden rooms unless searching
+    if (room.isHidden && searchQuery.trim() === '') {
       return false;
     }
     return true;
@@ -307,6 +319,27 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({ onRoomSelect, selectedRoomI
                             <Edit size={14} />
                           </button>
                         )}
+                        <button
+                          onClick={() => toggleRoomVisibility(room)}
+                          className={`p-2 transition-colors ${
+                            room.isHidden 
+                              ? 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400' 
+                              : 'text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300'
+                          }`}
+                          aria-label={room.isHidden ? "Show room" : "Hide room"}
+                        >
+                          {room.isHidden ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                              <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                          )}
+                        </button>
                         <button
                           onClick={() => handleDeleteRoom(room.id)}
                           className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
