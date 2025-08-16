@@ -44,6 +44,8 @@ function App() {
                 <ChatRoom 
                   roomId={selectedRoom.id} 
                   roomName={selectedRoom.name} 
+                  isPrivate={selectedRoom.isPrivate}
+                  password={selectedRoom.password}
                 />
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-6 text-center">

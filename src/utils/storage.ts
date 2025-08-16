@@ -4,6 +4,7 @@ const USER_NAME_KEY = 'doro-chat-user-name';
 const USER_COLOR_KEY = 'doro-chat-user-color';
 const USER_FONT_STYLE_KEY = 'doro-chat-user-font-style';
 const VOICE_NOTES_KEY = 'doro-chat-voice-notes';
+const SAVED_ROOMS_KEY = 'doro-chat-saved-rooms';
 
 // Generate a random user ID if one doesn't exist
 export const getUserId = (): string => {
@@ -81,6 +82,34 @@ export const getVoiceNote = (roomId: string, voiceNoteId: string): string | null
   return null;
 };
 
+// Saved rooms functions
+export const getSavedRooms = (): { [roomId: string]: { name: string; password?: string } } => {
+  const savedRoomsJson = localStorage.getItem(SAVED_ROOMS_KEY) || '{}';
+  return JSON.parse(savedRoomsJson);
+};
+
+export const saveRoom = (roomId: string, roomName: string, password?: string): void => {
+  const savedRooms = getSavedRooms();
+  savedRooms[roomId] = { name: roomName, password };
+  localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(savedRooms));
+};
+
+export const removeSavedRoom = (roomId: string): void => {
+  const savedRooms = getSavedRooms();
+  delete savedRooms[roomId];
+  localStorage.setItem(SAVED_ROOMS_KEY, JSON.stringify(savedRooms));
+};
+
+export const isRoomSaved = (roomId: string): boolean => {
+  const savedRooms = getSavedRooms();
+  return roomId in savedRooms;
+};
+
+export const getSavedRoomPassword = (roomId: string): string | undefined => {
+  const savedRooms = getSavedRooms();
+  return savedRooms[roomId]?.password;
+};
+
 export default {
   getUserId,
   getUserName,
@@ -91,4 +120,9 @@ export default {
   setUserFontStyle,
   saveVoiceNote,
   getVoiceNote,
+  getSavedRooms,
+  saveRoom,
+  removeSavedRoom,
+  isRoomSaved,
+  getSavedRoomPassword,
 };

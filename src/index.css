@@ -14,6 +14,64 @@ body {
   font-family: 'Patrick Hand', cursive;
 }
 
+/* Smooth animations */
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-in {
+  animation: animate-in 0.2s ease-out;
+}
+
+@keyframes slide-in-from-top-2 {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-from-top-2 {
+  animation: slide-in-from-top-2 0.2s ease-out;
+}
+
+@keyframes zoom-in-95 {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.zoom-in-95 {
+  animation: zoom-in-95 0.2s ease-out;
+}
+
+/* Enhanced transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 /* Mobile message input styles */
 @media (max-width: 768px) {
   .message-input-container {
