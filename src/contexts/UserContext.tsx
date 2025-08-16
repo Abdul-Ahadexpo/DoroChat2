@@ -24,6 +24,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       name: storage.getUserName(),
       color: storage.getUserColor(),
       fontStyle: storage.getUserFontStyle(),
+      profileImage: storage.getUserProfileImage(),
     };
     
     setUser(loadedUser);
@@ -38,6 +39,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (updates.name) storage.setUserName(updates.name);
       if (updates.color) storage.setUserColor(updates.color);
       if (updates.fontStyle) storage.setUserFontStyle(updates.fontStyle);
+      if (updates.profileImage !== undefined) storage.setUserProfileImage(updates.profileImage);
       
       return updatedUser;
     });

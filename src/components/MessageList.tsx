@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Message, MessageType } from '../utils/types';
 import { useUser } from '../contexts/UserContext';
-import { editMessage, deleteMessage } from '../services/firebase';
+import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage } from '../services/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import VoiceNotePlayer from './VoiceNotePlayer';
@@ -22,6 +22,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const [editContent, setEditContent] = useState('');
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const { user } = useUser();
+
+  // Mark messages as seen when they come into view
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.senderId !== user.id) {
+        markMessageAsSeen(roomId, lastMessage.id, user.id);
+        updateLastSeenMessage(roomId, user.id, lastMessage.id);
+      }
+    }
+  }, [messages, roomId, user.id]);
 
   useEffect(() => {
     if (autoScroll && messagesEndRef.current) {
@@ -93,6 +104,42 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     setEditContent('');
   };
 
+  const getSeenCount = (message: Message) => {
+    if (!message.seenBy) return 0;
+    return Object.keys(message.seenBy).filter(userId => userId !== message.senderId).length;
+  };
+
+  const ProfileImage: React.FC<{ src?: string; name: string; color: string; size?: number }> = ({ 
+    src, 
+    name, 
+    color, 
+    size = 32 
+  }) => {
+    if (src) {
+      return (
+        <img
+          src={src}
+          alt={`${name}'s profile`}
+          className={`rounded-full object-cover flex-shrink-0`}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
+    
+    return (
+      <div
+        className={`rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}
+        style={{ 
+          width: size, 
+          height: size, 
+          backgroundColor: color,
+          fontSize: size * 0.4
+        }}
+      >
+        {name.charAt(0).toUpperCase()}
+      </div>
+    );
+  };
   return (
     <div 
       ref={containerRef}
@@ -115,8 +162,15 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
           
           {dateMessages.map((message) => (
             <div key={message.id} className="flex flex-col">
-              <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline space-x-1 md:space-x-2">
+              <div className="flex items-start justify-between mb-1">
+                <div className="flex items-center space-x-2">
+                  <ProfileImage 
+                    src={message.senderProfileImage} 
+                    name={message.senderName} 
+                    color={message.senderColor}
+                    size={24}
+                  />
+                  <div className="flex items-baseline space-x-1 md:space-x-2">
                   <span 
                     className={`font-medium text-sm md:text-base ${message.senderFontStyle}`}
                     style={{ color: message.senderColor }}
@@ -129,6 +183,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                       <span className="ml-1 text-gray-400">(edited)</span>
                     )}
                   </span>
+                </div>
                 </div>
                 
                 <div className="flex items-center space-x-1">
@@ -238,6 +293,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                   </>
                 )}
               </div>
+              
+              {/* Read receipts for sender's messages */}
+              {message.senderId === user.id && getSeenCount(message) > 0 && (
+                <div className="text-xs text-gray-400 dark:text-gray-500 ml-8 mt-1">
+                  Seen by {getSeenCount(message)}
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -3,6 +3,7 @@ export interface User {
   name: string;
   color: string;
   fontStyle: string;
+  profileImage?: string;
 }
 
 export interface ChatRoom {
@@ -30,6 +31,7 @@ export interface Message {
   senderName: string;
   senderColor: string;
   senderFontStyle: string;
+  senderProfileImage?: string;
   content: string;
   type: MessageType;
   timestamp: number;
@@ -39,6 +41,7 @@ export interface Message {
     content: string;
     senderName: string;
   } | null;
+  seenBy?: { [userId: string]: number };
 }
 
 export interface VoiceNote {
@@ -53,4 +56,16 @@ export interface VoiceNote {
 
 export interface ImageMessage extends Message {
   imageUrl: string;
+}
+
+export interface TypingIndicator {
+  userId: string;
+  userName: string;
+  timestamp: number;
+}
+
+export interface ReadReceipt {
+  userId: string;
+  userName: string;
+  timestamp: number;
 }

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { getSavedRooms, removeSavedRoom } from '../utils/storage';
-import { Settings, Save, Trash2, Bookmark } from 'lucide-react';
+import { uploadImage } from '../utils/imgbb';
+import { Settings, Save, Trash2, Bookmark, Camera, X } from 'lucide-react';
 
 const fontStyles = [
   { name: 'Normal', value: 'normal' },
@@ -29,6 +30,8 @@ const UserSettings: React.FC = () => {
   const [fontStyle, setFontStyle] = useState(user.fontStyle);
   const [savedRooms, setSavedRooms] = useState(getSavedRooms());
   const [activeTab, setActiveTab] = useState<'profile' | 'rooms'>('profile');
+  const [profileImage, setProfileImage] = useState(user.profileImage || '');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const toggleSettings = () => {
     setIsOpen(!isOpen);
@@ -37,19 +40,46 @@ const UserSettings: React.FC = () => {
       setName(user.name);
       setColor(user.color);
       setFontStyle(user.fontStyle);
+      setProfileImage(user.profileImage || '');
       setSavedRooms(getSavedRooms());
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUser({ name, color, fontStyle });
+    updateUser({ name, color, fontStyle, profileImage });
     setIsOpen(false);
   };
 
   const handleRemoveSavedRoom = (roomId: string) => {
     removeSavedRoom(roomId);
     setSavedRooms(getSavedRooms());
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size should be less than 2MB');
+      return;
+    }
+    
+    setIsUploadingImage(true);
+    
+    try {
+      const imageUrl = await uploadImage(file);
+      setProfileImage(imageUrl);
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      alert(`Failed to upload image: ${error.message}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const removeProfileImage = () => {
+    setProfileImage('');
   };
 
   return (
@@ -90,6 +120,59 @@ const UserSettings: React.FC = () => {
           {activeTab === 'profile' ? (
           <form onSubmit={handleSubmit}>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">User Settings</h3>
+            
+            {/* Profile Image Section */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Profile Picture
+              </label>
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  {profileImage ? (
+                    <div className="relative">
+                      <img
+                        src={profileImage}
+                        alt="Profile"
+                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeProfileImage}
+                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold border-2 border-gray-200 dark:border-gray-600"
+                      style={{ backgroundColor: color }}
+                    >
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="profile-image-upload"
+                    disabled={isUploadingImage}
+                  />
+                  <label
+                    htmlFor="profile-image-upload"
+                    className={`inline-flex items-center space-x-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer transition-colors ${
+                      isUploadingImage ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <Camera size={16} />
+                    <span>{isUploadingImage ? 'Uploading...' : 'Upload Photo'}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
             
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

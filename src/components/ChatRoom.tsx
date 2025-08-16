@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getMessages } from '../services/firebase';
+import { getMessages, getTypingIndicators } from '../services/firebase';
 import { useUser } from '../contexts/UserContext';
 import { saveRoom, removeSavedRoom, isRoomSaved } from '../utils/storage';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
-import { Message } from '../utils/types';
+import TypingIndicator from './TypingIndicator';
+import { Message, TypingIndicator as TypingIndicatorType } from '../utils/types';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 
 interface ChatRoomProps {
@@ -18,6 +19,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, roomName, isPrivate, passwo
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<TypingIndicatorType[]>([]);
   const [replyTo, setReplyTo] = useState<{
     id: string;
     content: string;
@@ -35,8 +37,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, roomName, isPrivate, passwo
       setLoading(false);
     });
     
+    const unsubscribeTyping = getTypingIndicators(roomId, (typingList) => {
+      // Filter out old typing indicators (older than 5 seconds)
+      const now = Date.now();
+      const activeTyping = typingList.filter(typing => 
+        now - typing.timestamp < 5000
+      );
+      setTypingUsers(activeTyping);
+    });
+    
     return () => {
       unsubscribe;
+      unsubscribeTyping;
     };
   }, [roomId]);
 
@@ -93,6 +105,8 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, roomName, isPrivate, passwo
           onReply={handleReply}
         />
       )}
+      
+      <TypingIndicator typingUsers={typingUsers} currentUserId={user.id} />
       
       <MessageInput 
         roomId={roomId}

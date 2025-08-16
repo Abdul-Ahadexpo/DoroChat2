@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useUser } from '../contexts/UserContext';
-import { sendMessage, sendVoiceNote, deleteVoiceNote } from '../services/firebase';
+import { sendMessage, sendVoiceNote, deleteVoiceNote, setTypingIndicator, removeTypingIndicator } from '../services/firebase';
 import { uploadImage } from '../utils/imgbb';
 import { MessageType } from '../utils/types';
 import { saveVoiceNote } from '../utils/storage';
@@ -30,6 +30,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useUser();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const recorderControls = useAudioRecorder();
 
@@ -52,6 +53,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         senderName: user.name,
         senderColor: user.color,
         senderFontStyle: user.fontStyle,
+        senderProfileImage: user.profileImage,
         content: message,
         type: MessageType.TEXT,
         replyTo: replyTo ? {
@@ -65,6 +67,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
+      // Remove typing indicator when message is sent
+      removeTypingIndicator(roomId, user.id);
       if (onCancelReply) onCancelReply();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -99,6 +103,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           senderName: user.name,
           senderColor: user.color,
           senderFontStyle: user.fontStyle,
+          senderProfileImage: user.profileImage,
           content: imageUrl,
           type: MessageType.IMAGE,
           replyTo: replyTo ? {
@@ -184,6 +189,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
             senderName: user.name,
             senderColor: user.color,
             senderFontStyle: user.fontStyle,
+            senderProfileImage: user.profileImage,
             content: audioDataUrl,
             type: MessageType.VOICE,
             id: voiceNoteId,
@@ -201,6 +207,21 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         console.error('Error sending voice note:', error);
       }
     };
+  };
+
+  const handleTyping = () => {
+    // Set typing indicator
+    setTypingIndicator(roomId, user.id, user.name);
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to remove typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      removeTypingIndicator(roomId, user.id);
+    }, 2000);
   };
 
   const formatRecordingTime = (seconds: number) => {
@@ -269,6 +290,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
             value={message}
             onChange={(e) => {
               setMessage(e.target.value);
+              handleTyping();
               adjustTextareaHeight();
             }}
             placeholder="Type a message..."

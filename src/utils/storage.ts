@@ -3,6 +3,7 @@ const USER_ID_KEY = 'doro-chat-user-id';
 const USER_NAME_KEY = 'doro-chat-user-name';
 const USER_COLOR_KEY = 'doro-chat-user-color';
 const USER_FONT_STYLE_KEY = 'doro-chat-user-font-style';
+const USER_PROFILE_IMAGE_KEY = 'doro-chat-user-profile-image';
 const VOICE_NOTES_KEY = 'doro-chat-voice-notes';
 const SAVED_ROOMS_KEY = 'doro-chat-saved-rooms';
 
@@ -46,6 +47,16 @@ export const getUserFontStyle = (): string => {
 
 export const setUserFontStyle = (fontStyle: string): void => {
   localStorage.setItem(USER_FONT_STYLE_KEY, fontStyle);
+};
+
+// User profile image functions
+export const getUserProfileImage = (): string => {
+  const userProfileImage = localStorage.getItem(USER_PROFILE_IMAGE_KEY);
+  return userProfileImage || '';
+};
+
+export const setUserProfileImage = (profileImage: string): void => {
+  localStorage.setItem(USER_PROFILE_IMAGE_KEY, profileImage);
 };
 
 // Voice notes storage
@@ -118,6 +129,8 @@ export default {
   setUserColor,
   getUserFontStyle,
   setUserFontStyle,
+  getUserProfileImage,
+  setUserProfileImage,
   saveVoiceNote,
   getVoiceNote,
   getSavedRooms,

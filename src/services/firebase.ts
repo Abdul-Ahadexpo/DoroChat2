@@ -91,6 +91,7 @@ export const sendMessage = async (roomId: string, message: any) => {
   await set(newMessageRef, {
     ...message,
     timestamp: serverTimestamp(),
+    seenBy: {},
   });
   
   return newMessageRef.key;
@@ -141,6 +142,62 @@ export const deleteVoiceNote = async (roomId: string, voiceNoteId: string) => {
   await remove(voiceNoteRef);
 };
 
+// Typing indicators
+export const setTypingIndicator = async (roomId: string, userId: string, userName: string) => {
+  const typingRef = ref(database, `typing/${roomId}/${userId}`);
+  await set(typingRef, {
+    userName,
+    timestamp: serverTimestamp(),
+  });
+  
+  // Auto-remove after 3 seconds
+  setTimeout(async () => {
+    await remove(typingRef);
+  }, 3000);
+};
+
+export const removeTypingIndicator = async (roomId: string, userId: string) => {
+  const typingRef = ref(database, `typing/${roomId}/${userId}`);
+  await remove(typingRef);
+};
+
+export const getTypingIndicators = (roomId: string, callback: (typing: any[]) => void) => {
+  const typingRef = ref(database, `typing/${roomId}`);
+  
+  onValue(typingRef, (snapshot) => {
+    const data = snapshot.val();
+    const typing = data ? Object.entries(data).map(([userId, info]) => ({
+      userId,
+      ...info as object
+    })) : [];
+    
+    callback(typing);
+  });
+};
+
+// Read receipts
+export const markMessageAsSeen = async (roomId: string, messageId: string, userId: string) => {
+  const seenRef = ref(database, `messages/${roomId}/${messageId}/seenBy/${userId}`);
+  await set(seenRef, serverTimestamp());
+};
+
+export const getLastSeenMessage = (roomId: string, callback: (lastSeen: any) => void) => {
+  const lastSeenRef = ref(database, `lastSeen/${roomId}`);
+  
+  onValue(lastSeenRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(data || {});
+  });
+};
+
+export const updateLastSeenMessage = async (roomId: string, userId: string, messageId: string) => {
+  const lastSeenRef = ref(database, `lastSeen/${roomId}/${userId}`);
+  await set(lastSeenRef, {
+    messageId,
+    timestamp: serverTimestamp(),
+  });
+};
+
 export default {
   database,
   createChatRoom,
@@ -152,4 +209,10 @@ export default {
   sendVoiceNote,
   deleteVoiceNote,
   deleteRoom,
+  setTypingIndicator,
+  removeTypingIndicator,
+  getTypingIndicators,
+  markMessageAsSeen,
+  getLastSeenMessage,
+  updateLastSeenMessage,
 };
