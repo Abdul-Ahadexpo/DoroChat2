@@ -115,11 +115,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     color, 
     size = 32 
   }) => {
+    const safeName = name || 'Unknown';
+    
     if (src) {
       return (
         <img
           src={src}
-          alt={`${name}'s profile`}
+          alt={`${safeName}'s profile`}
           className={`rounded-full object-cover flex-shrink-0`}
           style={{ width: size, height: size }}
         />
@@ -136,7 +138,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
           fontSize: size * 0.4
         }}
       >
-        {name.charAt(0).toUpperCase()}
+        {safeName.charAt(0).toUpperCase()}
       </div>
     );
   };
@@ -281,6 +283,26 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     
                     {message.type === MessageType.IMAGE && (
                       <ImageMessage imageUrl={message.content} />
+                    )}
+                    
+                    {message.type === MessageType.VIDEO && (
+                      (() => {
+                        try {
+                          const videoData = JSON.parse(message.content);
+                          return (
+                            <VideoMessage 
+                              videoUrl={videoData.videoUrl} 
+                              thumbnailUrl={videoData.thumbnailUrl}
+                            />
+                          );
+                        } catch (error) {
+                          return (
+                            <div className="text-red-500 text-sm">
+                              Error loading video
+                            </div>
+                          );
+                        }
+                      })()
                     )}
                     
                     {message.type === MessageType.VOICE && (
