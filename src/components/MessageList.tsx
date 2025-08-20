@@ -285,26 +285,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                       <ImageMessage imageUrl={message.content} />
                     )}
                     
-                    {message.type === MessageType.VIDEO && (
-                      (() => {
-                        try {
-                          const videoData = JSON.parse(message.content);
-                          return (
-                            <VideoMessage 
-                              videoUrl={videoData.videoUrl} 
-                              thumbnailUrl={videoData.thumbnailUrl}
-                            />
-                          );
-                        } catch (error) {
-                          return (
-                            <div className="text-red-500 text-sm">
-                              Error loading video
-                            </div>
-                          );
-                        }
-                      })()
-                    )}
-                    
                     {message.type === MessageType.VOICE && (
                       <VoiceNotePlayer 
                         roomId={roomId}

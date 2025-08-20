@@ -7,7 +7,6 @@ import { saveVoiceNote } from '../utils/storage';
 import { Send, Image, Mic, MicOff, Smile, MoreHorizontal, X, Video } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
-import { uploadVideo } from '../utils/apivideo';
 
 interface MessageInputProps {
   roomId: string;
@@ -27,10 +26,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const [recordingTime, setRecordingTime] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showTools, setShowTools] = useState(false);
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
-  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useUser();
@@ -83,24 +79,16 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Check if it's a video file
-    const videoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/quicktime'];
-    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    // Check if it's a valid image file
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     
-    if (videoTypes.includes(file.type)) {
-      // Handle video upload
-      handleVideoUpload(e);
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid image file (JPEG, PNG, GIF, WebP)');
       return;
     }
     
-    if (!imageTypes.includes(file.type)) {
-      alert('Please select a valid image or video file');
-      return;
-    }
-    
-    // Handle image upload
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB');
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Image size should be less than 20MB');
       return;
     }
     
@@ -143,64 +131,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         setUploadProgress(0);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
-        }
-        if (onCancelReply) onCancelReply();
-      });
-  };
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Validate file size (100MB limit)
-    if (file.size > 100 * 1024 * 1024) {
-      alert('Video size should be less than 100MB');
-      return;
-    }
-    
-    // Validate file type
-    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/mov', 'video/quicktime'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Unsupported video format. Please use MP4, WebM, OGG, AVI, or MOV');
-      return;
-    }
-    
-    setIsUploadingVideo(true);
-    setVideoUploadProgress(0);
-    setShowTools(false);
-    
-    uploadVideo(file, (progress) => {
-      setVideoUploadProgress(progress);
-    })
-      .then(async (result) => {
-        await sendMessage(roomId, {
-          senderId: user.id,
-          senderName: user.name,
-          senderColor: user.color,
-          senderFontStyle: user.fontStyle,
-          senderProfileImage: user.profileImage,
-          content: JSON.stringify({
-            videoUrl: result.playbackUrl,
-            thumbnailUrl: result.thumbnailUrl,
-            videoId: result.videoId
-          }),
-          type: MessageType.VIDEO,
-          replyTo: replyTo ? {
-            id: replyTo.id,
-            content: replyTo.content,
-            senderName: replyTo.senderName
-          } : null
-        });
-      })
-      .catch((error) => {
-        console.error('Error uploading video:', error);
-        alert(`Failed to upload video: ${error.message}`);
-      })
-      .finally(() => {
-        setIsUploadingVideo(false);
-        setVideoUploadProgress(0);
-        if (videoInputRef.current) {
-          videoInputRef.current.value = '';
         }
         if (onCancelReply) onCancelReply();
       });
@@ -343,22 +273,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         </div>
       )}
       
-      {/* Video Upload Progress Bar */}
-      {isUploadingVideo && (
-        <div className="mb-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-purple-600 dark:text-purple-400">Uploading video...</span>
-            <span className="text-sm text-purple-600 dark:text-purple-400">{Math.round(videoUploadProgress)}%</span>
-          </div>
-          <div className="w-full bg-purple-200 dark:bg-purple-800 rounded-full h-2">
-            <div 
-              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${videoUploadProgress}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-      
       {/* Recording Timeline */}
       {isRecording && (
         <div className="mb-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
@@ -419,16 +333,16 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*"
+                accept="image/*"
                 onChange={handleImageUpload}
                 className="hidden"
                 id="image-upload"
-                disabled={isUploading || isUploadingVideo}
+                disabled={isUploading}
               />
               <label
                 htmlFor="image-upload"
-                className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${(isUploading || isUploadingVideo) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                aria-label="Upload image or video"
+                className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 cursor-pointer p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                aria-label="Upload image"
               >
                 <Image size={20} />
               </label>
@@ -457,8 +371,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           
           <button
             type="submit"
-            disabled={message.trim() === '' || isUploading || isUploadingVideo}
-            className={`bg-violet-600 hover:bg-violet-700 text-white p-2 md:p-3 rounded-full transition-colors ${(message.trim() === '' || isUploading || isUploadingVideo) ? 'opacity-50 cursor-not-allowed' : 'shadow-lg hover:shadow-xl'}`}
+            disabled={message.trim() === '' || isUploading}
+            className={`bg-violet-600 hover:bg-violet-700 text-white p-2 md:p-3 rounded-full transition-colors ${(message.trim() === '' || isUploading) ? 'opacity-50 cursor-not-allowed' : 'shadow-lg hover:shadow-xl'}`}
             aria-label="Send message"
           >
             <Send size={18} />
@@ -481,16 +395,16 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           
           <label
             htmlFor="image-upload-mobile"
-            className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer ${(isUploading || isUploadingVideo) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <Image size={24} />
             <input
               id="image-upload-mobile"
               type="file"
-              accept="image/*,video/*"
+              accept="image/*"
               onChange={handleImageUpload}
               className="hidden"
-              disabled={isUploading || isUploadingVideo}
+              disabled={isUploading}
             />
           </label>
           

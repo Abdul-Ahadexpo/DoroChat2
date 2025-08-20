@@ -22,8 +22,7 @@ export interface ChatRoom {
 export enum MessageType {
   TEXT = 'text',
   IMAGE = 'image',
-  VOICE = 'voice',
-  VIDEO = 'video'
+  VOICE = 'voice'
 }
 
 export interface Message {
