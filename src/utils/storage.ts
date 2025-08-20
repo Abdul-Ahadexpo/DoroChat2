@@ -6,6 +6,12 @@ const USER_FONT_STYLE_KEY = 'doro-chat-user-font-style';
 const USER_PROFILE_IMAGE_KEY = 'doro-chat-user-profile-image';
 const VOICE_NOTES_KEY = 'doro-chat-voice-notes';
 const SAVED_ROOMS_KEY = 'doro-chat-saved-rooms';
+const THEME_KEY = 'doro-chat-theme';
+const NOTIFICATION_SETTINGS_KEY = 'doro-chat-notification-settings';
+const CHAT_SETTINGS_KEY = 'doro-chat-chat-settings';
+const PRIVACY_SETTINGS_KEY = 'doro-chat-privacy-settings';
+const BLOCKED_USERS_KEY = 'doro-chat-blocked-users';
+const CUSTOM_STATUS_KEY = 'doro-chat-custom-status';
 
 // Generate a random user ID if one doesn't exist
 export const getUserId = (): string => {
@@ -121,6 +127,111 @@ export const getSavedRoomPassword = (roomId: string): string | undefined => {
   return savedRooms[roomId]?.password;
 };
 
+// Theme settings
+export const getTheme = (): 'light' | 'dark' | 'auto' => {
+  const theme = localStorage.getItem(THEME_KEY);
+  return (theme as 'light' | 'dark' | 'auto') || 'auto';
+};
+
+export const setTheme = (theme: 'light' | 'dark' | 'auto'): void => {
+  localStorage.setItem(THEME_KEY, theme);
+};
+
+// Notification settings
+export const getNotificationSettings = () => {
+  const settings = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+  return settings ? JSON.parse(settings) : {
+    enabled: true,
+    sound: true,
+    desktop: true,
+    mentions: true,
+    privateMessages: true,
+    soundVolume: 0.5,
+    customSound: 'default'
+  };
+};
+
+export const setNotificationSettings = (settings: any): void => {
+  localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+};
+
+// Chat settings
+export const getChatSettings = () => {
+  const settings = localStorage.getItem(CHAT_SETTINGS_KEY);
+  return settings ? JSON.parse(settings) : {
+    fontSize: 'medium',
+    messageGrouping: true,
+    showTimestamps: true,
+    showReadReceipts: true,
+    showTypingIndicators: true,
+    autoScroll: true,
+    compactMode: false,
+    showProfilePictures: true,
+    messagePreview: true,
+    enterToSend: true
+  };
+};
+
+export const setChatSettings = (settings: any): void => {
+  localStorage.setItem(CHAT_SETTINGS_KEY, JSON.stringify(settings));
+};
+
+// Privacy settings
+export const getPrivacySettings = () => {
+  const settings = localStorage.getItem(PRIVACY_SETTINGS_KEY);
+  return settings ? JSON.parse(settings) : {
+    showOnlineStatus: true,
+    allowDirectMessages: true,
+    showLastSeen: true,
+    showReadReceipts: true,
+    allowRoomInvites: true,
+    showTypingStatus: true,
+    profileVisibility: 'everyone'
+  };
+};
+
+export const setPrivacySettings = (settings: any): void => {
+  localStorage.setItem(PRIVACY_SETTINGS_KEY, JSON.stringify(settings));
+};
+
+// Blocked users
+export const getBlockedUsers = (): string[] => {
+  const blocked = localStorage.getItem(BLOCKED_USERS_KEY);
+  return blocked ? JSON.parse(blocked) : [];
+};
+
+export const blockUser = (userId: string): void => {
+  const blocked = getBlockedUsers();
+  if (!blocked.includes(userId)) {
+    blocked.push(userId);
+    localStorage.setItem(BLOCKED_USERS_KEY, JSON.stringify(blocked));
+  }
+};
+
+export const unblockUser = (userId: string): void => {
+  const blocked = getBlockedUsers();
+  const filtered = blocked.filter(id => id !== userId);
+  localStorage.setItem(BLOCKED_USERS_KEY, JSON.stringify(filtered));
+};
+
+export const isUserBlocked = (userId: string): boolean => {
+  return getBlockedUsers().includes(userId);
+};
+
+// Custom status
+export const getCustomStatus = () => {
+  const status = localStorage.getItem(CUSTOM_STATUS_KEY);
+  return status ? JSON.parse(status) : {
+    text: '',
+    emoji: '',
+    expiresAt: null
+  };
+};
+
+export const setCustomStatus = (status: any): void => {
+  localStorage.setItem(CUSTOM_STATUS_KEY, JSON.stringify(status));
+};
+
 export default {
   getUserId,
   getUserName,
@@ -138,4 +249,18 @@ export default {
   removeSavedRoom,
   isRoomSaved,
   getSavedRoomPassword,
+  getTheme,
+  setTheme,
+  getNotificationSettings,
+  setNotificationSettings,
+  getChatSettings,
+  setChatSettings,
+  getPrivacySettings,
+  setPrivacySettings,
+  getBlockedUsers,
+  blockUser,
+  unblockUser,
+  isUserBlocked,
+  getCustomStatus,
+  setCustomStatus,
 };
