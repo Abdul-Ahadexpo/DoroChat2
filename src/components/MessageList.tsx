@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Message, MessageType } from '../utils/types';
 import { useUser } from '../contexts/UserContext';
 import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage } from '../services/firebase';
+import { getCustomStatus, getChatSettings } from '../utils/storage';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import ImageMessage from './ImageMessage';
-import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
+import { Reply, Edit, Trash2, MoreVertical, Check, X, Clock } from 'lucide-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -22,6 +23,29 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const [editContent, setEditContent] = useState('');
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const { user } = useUser();
+  const [showStatusModal, setShowStatusModal] = useState<string | null>(null);
+  const [userStatuses, setUserStatuses] = useState<{ [userId: string]: any }>({});
+  const chatSettings = getChatSettings();
+
+  // Load user statuses
+  useEffect(() => {
+    const loadUserStatuses = () => {
+      const statuses: { [userId: string]: any } = {};
+      messages.forEach(message => {
+        if (!statuses[message.senderId]) {
+          // In a real app, this would come from a shared database
+          // For now, we'll simulate it with localStorage for demo
+          const status = getCustomStatus();
+          if (message.senderId === user.id && (status.text || status.emoji)) {
+            statuses[message.senderId] = status;
+          }
+        }
+      });
+      setUserStatuses(statuses);
+    };
+
+    loadUserStatuses();
+  }, [messages, user.id]);
 
   // Mark messages as seen when they come into view
   useEffect(() => {
@@ -113,39 +137,69 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     src, 
     name, 
     color, 
-    size = 32 
+    size = 32,
+    userId
   }) => {
     const safeName = name || 'Unknown';
+    const hasStatus = userStatuses[userId] && (userStatuses[userId].text || userStatuses[userId].emoji);
+    
+    const handleStatusClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (hasStatus) {
+        setShowStatusModal(userId);
+      }
+    };
     
     if (src) {
       return (
-        <img
-          src={src}
-          alt={`${safeName}'s profile`}
-          className={`rounded-full object-cover flex-shrink-0`}
-          style={{ width: size, height: size }}
-        />
+        <div className="relative">
+          <img
+            src={src}
+            alt={`${safeName}'s profile`}
+            className={`rounded-full object-cover flex-shrink-0 cursor-pointer transition-all duration-200 ${
+              hasStatus ? 'ring-2 ring-violet-400 ring-opacity-60 hover:ring-opacity-100 shadow-lg' : ''
+            }`}
+            style={{ width: size, height: size }}
+            onClick={handleStatusClick}
+          />
+          {hasStatus && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-violet-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></div>
+          )}
+        </div>
       );
     }
     
     return (
-      <div
-        className={`rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}
-        style={{ 
-          width: size, 
-          height: size, 
-          backgroundColor: color,
-          fontSize: size * 0.4
-        }}
-      >
-        {safeName.charAt(0).toUpperCase()}
+      <div className="relative">
+        <div
+          className={`rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 cursor-pointer transition-all duration-200 ${
+            hasStatus ? 'ring-2 ring-violet-400 ring-opacity-60 hover:ring-opacity-100 shadow-lg' : ''
+          }`}
+          style={{ 
+            width: size, 
+            height: size, 
+            backgroundColor: color,
+            fontSize: size * 0.4
+          }}
+          onClick={handleStatusClick}
+        >
+          {safeName.charAt(0).toUpperCase()}
+        </div>
+        {hasStatus && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-violet-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></div>
+        )}
       </div>
     );
   };
+
   return (
     <div 
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4 bg-gray-50 dark:bg-gray-900"
+      className={`flex-1 overflow-y-auto p-2 md:p-4 space-y-2 md:space-y-4 bg-gray-50 dark:bg-gray-900 ${
+        chatSettings.fontSize === 'small' ? 'text-sm' :
+        chatSettings.fontSize === 'large' ? 'text-lg' :
+        chatSettings.fontSize === 'xl' ? 'text-xl' : 'text-base'
+      }`}
     >
       {Object.keys(groupedMessages).length === 0 && (
         <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
@@ -156,36 +210,43 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       
       {Object.entries(groupedMessages).map(([date, dateMessages]) => (
         <div key={date} className="space-y-1 md:space-y-2">
-          <div className="flex justify-center">
-            <div className="bg-gray-200 dark:bg-gray-700 px-2 md:px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300">
-              {date}
+          {chatSettings.showTimestamps && (
+            <div className="flex justify-center">
+              <div className="bg-gray-200 dark:bg-gray-700 px-2 md:px-3 py-1 rounded-full text-xs text-gray-600 dark:text-gray-300">
+                {date}
+              </div>
             </div>
-          </div>
+          )}
           
           {dateMessages.map((message) => (
-            <div key={message.id} className="flex flex-col">
+            <div key={message.id} className={`flex flex-col ${chatSettings.compactMode ? 'space-y-1' : 'space-y-2'}`}>
               <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center space-x-2">
-                  <ProfileImage 
-                    src={message.senderProfileImage} 
-                    name={message.senderName} 
-                    color={message.senderColor}
-                    size={24}
-                  />
+                  {chatSettings.showProfilePictures && (
+                    <ProfileImage 
+                      src={message.senderProfileImage} 
+                      name={message.senderName} 
+                      color={message.senderColor}
+                      size={chatSettings.compactMode ? 20 : 24}
+                      userId={message.senderId}
+                    />
+                  )}
                   <div className="flex items-baseline space-x-1 md:space-x-2">
-                  <span 
-                    className={`font-medium text-sm md:text-base ${message.senderFontStyle}`}
-                    style={{ color: message.senderColor }}
-                  >
-                    {message.senderName}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatTime(message.timestamp)}
-                    {message.editedAt && (
-                      <span className="ml-1 text-gray-400">(edited)</span>
+                    <span 
+                      className={`font-medium ${chatSettings.compactMode ? 'text-xs' : 'text-sm md:text-base'} ${message.senderFontStyle}`}
+                      style={{ color: message.senderColor }}
+                    >
+                      {message.senderName}
+                    </span>
+                    {chatSettings.showTimestamps && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatTime(message.timestamp)}
+                        {message.editedAt && (
+                          <span className="ml-1 text-gray-400">(edited)</span>
+                        )}
+                      </span>
                     )}
-                  </span>
-                </div>
+                  </div>
                 </div>
                 
                 <div className="flex items-center space-x-1">
@@ -248,7 +309,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                       type="text"
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
-                      className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-gray-700 dark:text-white"
+                      className={`flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded ${chatSettings.compactMode ? 'text-xs' : 'text-sm'} dark:bg-gray-700 dark:text-white`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           handleEditMessage(message.id);
@@ -274,7 +335,11 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                 ) : (
                   <>
                     {message.type === MessageType.TEXT && (
-                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm md:text-base">
+                      <div className={`prose ${chatSettings.compactMode ? 'prose-xs' : 'prose-sm'} dark:prose-invert max-w-none ${
+                        chatSettings.fontSize === 'small' ? 'text-sm' :
+                        chatSettings.fontSize === 'large' ? 'text-lg' :
+                        chatSettings.fontSize === 'xl' ? 'text-xl' : 'text-base'
+                      }`}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
@@ -297,7 +362,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
               </div>
               
               {/* Read receipts for sender's messages */}
-              {message.senderId === user.id && getSeenCount(message) > 0 && (
+              {chatSettings.showReadReceipts && message.senderId === user.id && getSeenCount(message) > 0 && (
                 <div className="text-xs text-gray-400 dark:text-gray-500 ml-8 mt-1">
                   Seen by {getSeenCount(message)}
                 </div>
@@ -309,7 +374,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       
       <div ref={messagesEndRef} />
       
-      {!autoScroll && messages.length > 0 && (
+      {chatSettings.autoScroll && !autoScroll && messages.length > 0 && (
         <button
           onClick={() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -322,6 +387,49 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
+      )}
+      
+      {/* Status Modal */}
+      {showStatusModal && userStatuses[showStatusModal] && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setShowStatusModal(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full transform transition-all duration-300 animate-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center space-x-3 mb-4">
+              <ProfileImage 
+                src={messages.find(m => m.senderId === showStatusModal)?.senderProfileImage} 
+                name={messages.find(m => m.senderId === showStatusModal)?.senderName || 'Unknown'} 
+                color={messages.find(m => m.senderId === showStatusModal)?.senderColor || '#8B5CF6'}
+                size={48}
+                userId={showStatusModal}
+              />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {messages.find(m => m.senderId === showStatusModal)?.senderName || 'Unknown'}
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Custom Status</p>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+              <div className="flex items-center space-x-2">
+                {userStatuses[showStatusModal].emoji && (
+                  <span className="text-2xl">{userStatuses[showStatusModal].emoji}</span>
+                )}
+                <span className="text-gray-800 dark:text-gray-200">
+                  {userStatuses[showStatusModal].text || 'No status message'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowStatusModal(null)}
+                className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
