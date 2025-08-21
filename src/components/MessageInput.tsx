@@ -4,6 +4,7 @@ import { sendMessage, sendVoiceNote, deleteVoiceNote, setTypingIndicator, remove
 import { uploadImage } from '../utils/imgbb';
 import { MessageType } from '../utils/types';
 import { saveVoiceNote } from '../utils/storage';
+import { getChatSettings, getNotificationSettings } from '../utils/storage';
 import { Send, Image, Mic, MicOff, Smile, MoreHorizontal, X, Video } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
@@ -31,6 +32,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { user } = useUser();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatSettings = getChatSettings();
+  const notificationSettings = getNotificationSettings();
   
   const recorderControls = useAudioRecorder();
 
@@ -68,8 +71,13 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         textareaRef.current.style.height = 'auto';
       }
       // Remove typing indicator when message is sent
-      removeTypingIndicator(roomId, user.id);
+      if (chatSettings.showTypingIndicators) {
+        removeTypingIndicator(roomId, user.id);
+      }
       if (onCancelReply) onCancelReply();
+      
+      // Play notification sound if enabled
+      if (notificationSettings.enabled && notificationSettings.sound) {
     } catch (error) {
       console.error('Error sending message:', error);
     }
