@@ -4,6 +4,7 @@ import { useUser } from '../contexts/UserContext';
 import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage } from '../services/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { getCustomStatus } from '../utils/storage';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import ImageMessage from './ImageMessage';
 import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
@@ -109,39 +110,92 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     return Object.keys(message.seenBy).filter(userId => userId !== message.senderId).length;
   };
 
-  const ProfileImage: React.FC<{ src?: string; name: string; color: string; size?: number }> = ({ 
+  const [showStatusModal, setShowStatusModal] = useState<{
+    show: boolean;
+    status: any;
+    userName: string;
+  }>({ show: false, status: null, userName: '' });
+
+  const handleProfileClick = (senderId: string, senderName: string) => {
+    // Get user's custom status from localStorage (in a real app, this would come from a user database)
+    const userStatus = getCustomStatus(); // This is just for demo - in reality you'd fetch by senderId
+    
+    if (userStatus.text || userStatus.emoji) {
+      setShowStatusModal({
+        show: true,
+        status: userStatus,
+        userName: senderName
+      });
+    }
+  };
+
+  const closeStatusModal = () => {
+    setShowStatusModal({ show: false, status: null, userName: '' });
+  };
+
+  const ProfileImage: React.FC<{ 
+    src?: string; 
+    name: string; 
+    color: string; 
+    size?: number;
+    onClick?: () => void;
+    hasStatus?: boolean;
+  }> = ({
     src, 
     name, 
     color, 
-    size = 32 
+    size = 32,
+    onClick,
+    hasStatus = false
   }) => {
     const safeName = name || 'Unknown';
     
-    if (src) {
-      return (
-        <img
-          src={src}
-          alt={`${safeName}'s profile`}
-          className={`rounded-full object-cover flex-shrink-0`}
-          style={{ width: size, height: size }}
-        />
-      );
-    }
-    
-    return (
-      <div
-        className={`rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}
-        style={{ 
-          width: size, 
-          height: size, 
-          backgroundColor: color,
-          fontSize: size * 0.4
-        }}
-      >
-        {safeName.charAt(0).toUpperCase()}
+    const profileContent = (
+      <div className={`relative ${onClick ? 'cursor-pointer' : ''}`} onClick={onClick}>
+        {src ? (
+          <img
+            src={src}
+            alt={`${safeName}'s profile`}
+            className={`rounded-full object-cover flex-shrink-0 transition-all duration-200 ${
+              hasStatus ? 'ring-2 ring-violet-400 ring-opacity-60 shadow-lg shadow-violet-200 dark:shadow-violet-800' : ''
+            } ${onClick ? 'hover:scale-105' : ''}`}
+            style={{ width: size, height: size }}
+          />
+        ) : (
+          <div
+            className={`rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 transition-all duration-200 ${
+              hasStatus ? 'ring-2 ring-violet-400 ring-opacity-60 shadow-lg shadow-violet-200 dark:shadow-violet-800' : ''
+            } ${onClick ? 'hover:scale-105' : ''}`}
+            style={{ 
+              width: size, 
+              height: size, 
+              backgroundColor: color,
+              fontSize: size * 0.4
+            }}
+          >
+            {safeName.charAt(0).toUpperCase()}
+          </div>
+        )}
+        
+        {hasStatus && (
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-violet-500 rounded-full flex items-center justify-center">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          </div>
+        )}
       </div>
     );
+
+    return profileContent;
   };
+
+  // Mock function to check if user has status (in real app, this would check user database)
+  const userHasStatus = (senderId: string) => {
+    // For demo purposes, we'll show status indicator for current user
+    // In a real app, you'd check each user's status from a database
+    const currentUserStatus = getCustomStatus();
+    return senderId === user.id && (currentUserStatus.text || currentUserStatus.emoji);
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -171,6 +225,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     name={message.senderName} 
                     color={message.senderColor}
                     size={24}
+                    onClick={() => handleProfileClick(message.senderId, message.senderName)}
+                    hasStatus={userHasStatus(message.senderId)}
                   />
                   <div className="flex items-baseline space-x-1 md:space-x-2">
                   <span 
@@ -322,6 +378,54 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
+      )}
+      
+      {/* Custom Status Modal */}
+      {showStatusModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-all duration-300">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full transform transition-all duration-300 animate-in zoom-in-95">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {showStatusModal.userName}'s Status
+              </h3>
+              <button
+                onClick={closeStatusModal}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              {showStatusModal.status.emoji && (
+                <div className="text-3xl">
+                  {showStatusModal.status.emoji}
+                </div>
+              )}
+              <div className="flex-1">
+                {showStatusModal.status.text && (
+                  <p className="text-gray-800 dark:text-gray-200 font-medium">
+                    {showStatusModal.status.text}
+                  </p>
+                )}
+                {!showStatusModal.status.text && showStatusModal.status.emoji && (
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    Custom status
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={closeStatusModal}
+                className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
