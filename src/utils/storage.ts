@@ -219,8 +219,9 @@ export const isUserBlocked = (userId: string): boolean => {
 };
 
 // Custom status
-export const getCustomStatus = () => {
-  const status = localStorage.getItem(CUSTOM_STATUS_KEY);
+export const getCustomStatus = (userId?: string) => {
+  const key = userId ? `${CUSTOM_STATUS_KEY}-${userId}` : CUSTOM_STATUS_KEY;
+  const status = localStorage.getItem(key);
   return status ? JSON.parse(status) : {
     text: '',
     emoji: '',
@@ -228,8 +229,9 @@ export const getCustomStatus = () => {
   };
 };
 
-export const setCustomStatus = (status: any): void => {
-  localStorage.setItem(CUSTOM_STATUS_KEY, JSON.stringify(status));
+export const setCustomStatus = (status: any, userId?: string): void => {
+  const key = userId ? `${CUSTOM_STATUS_KEY}-${userId}` : CUSTOM_STATUS_KEY;
+  localStorage.setItem(key, JSON.stringify(status));
 };
 
 export default {
