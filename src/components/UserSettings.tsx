@@ -116,6 +116,15 @@ const UserSettings: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateUser({ name, color, fontStyle, profileImage });
+    // Also save the current user's status when updating profile
+    if (statusText || statusEmoji) {
+      const status = {
+        text: statusText,
+        emoji: statusEmoji,
+        expiresAt: null
+      };
+      setCustomStatus(status, user.id);
+    }
     setIsOpen(false);
   };
 
@@ -193,7 +202,7 @@ const UserSettings: React.FC = () => {
       expiresAt: null
     };
     setCustomStatusState(status);
-    setCustomStatus(status);
+    setCustomStatus(status, user.id);
   };
 
   const exportData = () => {
@@ -303,7 +312,7 @@ const UserSettings: React.FC = () => {
                                 setStatusEmoji(emoji);
                                 setShowStatusEmojis(false);
                               }}
-                              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-lg"
                             >
                               {emoji}
                             </button>
