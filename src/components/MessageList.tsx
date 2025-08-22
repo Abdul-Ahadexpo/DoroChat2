@@ -114,23 +114,25 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     show: boolean;
     status: any;
     userName: string;
-  }>({ show: false, status: null, userName: '' });
+    profileImage?: string;
+  }>({ show: false, status: null, userName: '', profileImage: '' });
 
-  const handleProfileClick = (senderId: string, senderName: string) => {
-    // Get user's custom status from localStorage (in a real app, this would come from a user database)
-    const userStatus = getCustomStatus(); // This is just for demo - in reality you'd fetch by senderId
+  const handleProfileClick = (senderId: string, senderName: string, senderProfileImage?: string) => {
+    // Get the specific user's custom status
+    const userStatus = getCustomStatus(senderId);
     
     if (userStatus.text || userStatus.emoji) {
       setShowStatusModal({
         show: true,
         status: userStatus,
-        userName: senderName
+        userName: senderName,
+        profileImage: senderProfileImage
       });
     }
   };
 
   const closeStatusModal = () => {
-    setShowStatusModal({ show: false, status: null, userName: '' });
+    setShowStatusModal({ show: false, status: null, userName: '', profileImage: '' });
   };
 
   const ProfileImage: React.FC<{ 
@@ -188,12 +190,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     return profileContent;
   };
 
-  // Mock function to check if user has status (in real app, this would check user database)
+  // Check if user has status by looking up their stored status
   const userHasStatus = (senderId: string) => {
-    // For demo purposes, we'll show status indicator for current user
-    // In a real app, you'd check each user's status from a database
-    const currentUserStatus = getCustomStatus();
-    return senderId === user.id && (currentUserStatus.text || currentUserStatus.emoji);
+    const userStatus = getCustomStatus(senderId);
+    return userStatus.text || userStatus.emoji;
   };
 
   return (
@@ -225,7 +225,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     name={message.senderName} 
                     color={message.senderColor}
                     size={24}
-                    onClick={() => handleProfileClick(message.senderId, message.senderName)}
+                    onClick={() => handleProfileClick(message.senderId, message.senderName, message.senderProfileImage)}
                     hasStatus={userHasStatus(message.senderId)}
                   />
                   <div className="flex items-baseline space-x-1 md:space-x-2">
@@ -396,21 +396,40 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
               </button>
             </div>
             
+            {/* User Profile Section */}
+            <div className="flex items-center space-x-3 mb-4">
+              <ProfileImage 
+                src={showStatusModal.profileImage} 
+                name={showStatusModal.userName} 
+                color="#8B5CF6"
+                size={48}
+                hasStatus={true}
+              />
+              <div>
+                <h4 className="font-medium text-gray-900 dark:text-white">
+                  {showStatusModal.userName}
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Custom Status
+                </p>
+              </div>
+            </div>
+            
             <div className="flex items-center space-x-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               {showStatusModal.status.emoji && (
-                <div className="text-3xl">
+                <div className="text-4xl">
                   {showStatusModal.status.emoji}
                 </div>
               )}
               <div className="flex-1">
                 {showStatusModal.status.text && (
-                  <p className="text-gray-800 dark:text-gray-200 font-medium">
+                  <p className="text-gray-800 dark:text-gray-200 font-medium text-lg">
                     {showStatusModal.status.text}
                   </p>
                 )}
                 {!showStatusModal.status.text && showStatusModal.status.emoji && (
                   <p className="text-gray-500 dark:text-gray-400 text-sm">
-                    Custom status
+                    No status message
                   </p>
                 )}
               </div>
