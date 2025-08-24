@@ -13,9 +13,8 @@ import {
   setPrivacySettings,
   getBlockedUsers,
   unblockUser,
-  getCustomStatus,
-  setCustomStatus
 } from '../utils/storage';
+import { setUserStatus, removeUserStatus, getUserStatus } from '../services/firebase';
 import { uploadImage } from '../utils/imgbb';
 import { 
   Settings, 
@@ -87,9 +86,9 @@ const UserSettings: React.FC = () => {
   const [chatSettings, setChatSettingsState] = useState(getChatSettings());
   const [privacySettings, setPrivacySettingsState] = useState(getPrivacySettings());
   const [blockedUsers, setBlockedUsers] = useState(getBlockedUsers());
-  const [customStatus, setCustomStatusState] = useState(getCustomStatus());
-  const [statusText, setStatusText] = useState(customStatus.text || '');
-  const [statusEmoji, setStatusEmoji] = useState(customStatus.emoji || '');
+  const [customStatus, setCustomStatusState] = useState({ text: '', emoji: '', expiresAt: null });
+  const [statusText, setStatusText] = useState('');
+  const [statusEmoji, setStatusEmoji] = useState('');
   const [showStatusEmojis, setShowStatusEmojis] = useState(false);
 
   const toggleSettings = () => {
@@ -106,25 +105,19 @@ const UserSettings: React.FC = () => {
       setChatSettingsState(getChatSettings());
       setPrivacySettingsState(getPrivacySettings());
       setBlockedUsers(getBlockedUsers());
-      const status = getCustomStatus();
-      setCustomStatusState(status);
-      setStatusText(status.text || '');
-      setStatusEmoji(status.emoji || '');
+      
+      // Load user's current status from Firebase
+      getUserStatus(user.id, (status) => {
+        setCustomStatusState(status);
+        setStatusText(status.text || '');
+        setStatusEmoji(status.emoji || '');
+      });
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateUser({ name, color, fontStyle, profileImage });
-    // Also save the current user's status when updating profile
-    if (statusText || statusEmoji) {
-      const status = {
-        text: statusText,
-        emoji: statusEmoji,
-        expiresAt: null
-      };
-      setCustomStatus(status, user.id);
-    }
     setIsOpen(false);
   };
 
@@ -195,14 +188,26 @@ const UserSettings: React.FC = () => {
     setBlockedUsers(getBlockedUsers());
   };
 
-  const handleStatusSave = () => {
+  const handleStatusSave = async () => {
     const status = {
       text: statusText,
       emoji: statusEmoji,
       expiresAt: null
     };
-    setCustomStatusState(status);
-    setCustomStatus(status, user.id);
+    
+    try {
+      if (statusText.trim() || statusEmoji) {
+        await setUserStatus(user.id, status);
+        setCustomStatusState(status);
+      } else {
+        // Remove status if both text and emoji are empty
+        await removeUserStatus(user.id);
+        setCustomStatusState({ text: '', emoji: '', expiresAt: null });
+      }
+    } catch (error) {
+      console.error('Error saving status:', error);
+      alert('Failed to save status. Please try again.');
+    }
   };
 
   const exportData = () => {
@@ -215,7 +220,7 @@ const UserSettings: React.FC = () => {
         chat: getChatSettings(),
         privacy: getPrivacySettings()
       },
-      customStatus: getCustomStatus(),
+      customStatus: customStatus,
       exportDate: new Date().toISOString()
     };
     
