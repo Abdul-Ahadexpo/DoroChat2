@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Message, MessageType } from '../utils/types';
 import { useUser } from '../contexts/UserContext';
-import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage } from '../services/firebase';
+import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage, getAllUserStatuses } from '../services/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getCustomStatus } from '../utils/storage';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import ImageMessage from './ImageMessage';
 import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
@@ -22,6 +21,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [userStatuses, setUserStatuses] = useState<{ [userId: string]: any }>({});
   const { user } = useUser();
 
   // Mark messages as seen when they come into view
@@ -34,6 +34,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       }
     }
   }, [messages, roomId, user.id]);
+
+  // Listen for all user statuses
+  useEffect(() => {
+    const unsubscribe = getAllUserStatuses((statuses) => {
+      setUserStatuses(statuses);
+    });
+    
+    return () => {
+      // Firebase listeners are automatically cleaned up
+    };
+  }, []);
 
   useEffect(() => {
     if (autoScroll && messagesEndRef.current) {
@@ -118,8 +129,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   }>({ show: false, status: null, userName: '', profileImage: '' });
 
   const handleProfileClick = (senderId: string, senderName: string, senderProfileImage?: string) => {
-    // Get the specific user's custom status
-    const userStatus = getCustomStatus(senderId);
+    // Get the user's custom status from Firebase data
+    const userStatus = userStatuses[senderId] || { text: '', emoji: '' };
     
     if (userStatus.text || userStatus.emoji) {
       setShowStatusModal({
@@ -192,7 +203,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
 
   // Check if user has status by looking up their stored status
   const userHasStatus = (senderId: string) => {
-    const userStatus = getCustomStatus(senderId);
+    const userStatus = userStatuses[senderId] || { text: '', emoji: '' };
     return userStatus.text || userStatus.emoji;
   };
 

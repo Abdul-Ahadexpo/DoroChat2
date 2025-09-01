@@ -198,6 +198,44 @@ export const updateLastSeenMessage = async (roomId: string, userId: string, mess
   });
 };
 
+// Custom Status functions
+export const setUserStatus = async (userId: string, status: { text: string; emoji: string; expiresAt?: number | null }) => {
+  const statusRef = ref(database, `userStatuses/${userId}`);
+  
+  if (!status.text && !status.emoji) {
+    // Remove status if both text and emoji are empty
+    await remove(statusRef);
+  } else {
+    await set(statusRef, {
+      ...status,
+      updatedAt: serverTimestamp(),
+    });
+  }
+};
+
+export const getUserStatus = (userId: string, callback: (status: any) => void) => {
+  const statusRef = ref(database, `userStatuses/${userId}`);
+  
+  onValue(statusRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(data || { text: '', emoji: '', expiresAt: null });
+  });
+};
+
+export const getAllUserStatuses = (callback: (statuses: { [userId: string]: any }) => void) => {
+  const statusesRef = ref(database, 'userStatuses');
+  
+  onValue(statusesRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(data || {});
+  });
+};
+
+export const removeUserStatus = async (userId: string) => {
+  const statusRef = ref(database, `userStatuses/${userId}`);
+  await remove(statusRef);
+};
+
 export default {
   database,
   createChatRoom,
@@ -215,4 +253,8 @@ export default {
   markMessageAsSeen,
   getLastSeenMessage,
   updateLastSeenMessage,
+  setUserStatus,
+  getUserStatus,
+  getAllUserStatuses,
+  removeUserStatus,
 };
