@@ -124,6 +124,11 @@ const UserSettings: React.FC = () => {
         expiresAt: null
       };
       setCustomStatus(status, user.id);
+      
+      // Also save to Firebase for real-time sharing
+      import('../services/firebase').then(({ setUserStatus }) => {
+        setUserStatus(user.id, status);
+      });
     }
     setIsOpen(false);
   };
@@ -203,6 +208,11 @@ const UserSettings: React.FC = () => {
     };
     setCustomStatusState(status);
     setCustomStatus(status, user.id);
+    
+    // Also save to Firebase for real-time sharing
+    import('../services/firebase').then(({ setUserStatus }) => {
+      setUserStatus(user.id, status);
+    });
   };
 
   const exportData = () => {
@@ -258,7 +268,7 @@ const UserSettings: React.FC = () => {
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 max-w-[90vw] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform animate-in slide-in-from-top-2 z-50">
+        <div className="absolute right-0 top-full mt-2 w-96 max-w-[90vw] max-h-[80vh] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform animate-in slide-in-from-top-2 z-50 flex flex-col">
           {/* Tab Navigation */}
           <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-200 dark:border-gray-700">
             {tabs.map((tab) => {
@@ -280,7 +290,7 @@ const UserSettings: React.FC = () => {
             })}
           </div>
 
-          <div className="p-4 max-h-96 overflow-y-auto">
+          <div className="p-4 overflow-y-auto flex-1 scrollbar-hide">
             {activeTab === 'profile' && (
               <form onSubmit={handleSubmit}>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -303,7 +313,7 @@ const UserSettings: React.FC = () => {
                         {statusEmoji || '😀'}
                       </button>
                       {showStatusEmojis && (
-                        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 grid grid-cols-6 gap-1 z-10">
+                        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 grid grid-cols-4 gap-2 z-10 status-emoji-picker">
                           {statusEmojis.map((emoji) => (
                             <button
                               key={emoji}
@@ -312,7 +322,7 @@ const UserSettings: React.FC = () => {
                                 setStatusEmoji(emoji);
                                 setShowStatusEmojis(false);
                               }}
-                              className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-lg"
+                              className="w-12 h-12 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 text-xl hover:scale-110 hover:shadow-md"
                             >
                               {emoji}
                             </button>

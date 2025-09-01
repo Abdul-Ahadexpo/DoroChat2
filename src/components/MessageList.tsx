@@ -37,13 +37,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
 
   // Listen for all user statuses
   useEffect(() => {
-    const unsubscribe = getAllUserStatuses((statuses) => {
+    getAllUserStatuses((statuses) => {
       setUserStatuses(statuses);
     });
-    
-    return () => {
-      // Firebase listeners are automatically cleaned up
-    };
   }, []);
 
   useEffect(() => {
