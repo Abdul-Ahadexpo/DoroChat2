@@ -124,6 +124,8 @@ html {
 .status-emoji-picker {
   animation: slideUp 0.2s ease-out;
   min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 @keyframes slideUp {
