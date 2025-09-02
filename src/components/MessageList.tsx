@@ -6,6 +6,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import VoiceNotePlayer from './VoiceNotePlayer';
 import ImageMessage from './ImageMessage';
+import YouTubeEmbed from './YouTubeEmbed';
+import { notificationManager } from '../utils/notifications';
+import { getNotificationSettings } from '../utils/storage';
 import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
 
 interface MessageListProps {
@@ -23,6 +26,40 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [userStatuses, setUserStatuses] = useState<{ [userId: string]: any }>({});
   const { user } = useUser();
+
+  // Initialize notifications
+  useEffect(() => {
+    const initNotifications = async () => {
+      const settings = getNotificationSettings();
+      if (settings.enabled) {
+        await notificationManager.requestPermission();
+      }
+    };
+    
+    initNotifications();
+  }, []);
+
+  // Handle new message notifications
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    
+    // Don't notify for own messages or old messages
+    if (lastMessage.senderId === user.id) return;
+    if (Date.now() - lastMessage.timestamp > 5000) return; // Ignore messages older than 5 seconds
+    
+    const settings = getNotificationSettings();
+    
+    // Check if user is mentioned
+    const isMentioned = lastMessage.content.toLowerCase().includes(user.name.toLowerCase());
+    
+    if (isMentioned) {
+      notificationManager.notifyMention(lastMessage.senderName, lastMessage.content, settings);
+    } else {
+      notificationManager.notifyNewMessage(lastMessage.senderName, lastMessage.content, settings);
+    }
+  }, [messages, user.id, user.name]);
 
   // Mark messages as seen when they come into view
   useEffect(() => {
@@ -355,6 +392,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                         audioUrl={message.content}
                       />
                     )}
+                    
+                    {message.type === MessageType.YOUTUBE && (
+                      <YouTubeEmbed url={message.content} />
+                    )}
                   </>
                 )}
               </div>
@@ -389,8 +430,15 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       
       {/* Custom Status Modal */}
       {showStatusModal.show && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-all duration-300">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-all duration-300"
+          onClick={closeStatusModal}
+        >
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full transform transition-all duration-300 animate-in zoom-in-95">
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="w-full"
+            >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {showStatusModal.userName}'s Status
@@ -449,6 +497,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
               >
                 Close
               </button>
+            </div>
             </div>
           </div>
         </div>
