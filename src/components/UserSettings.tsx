@@ -91,6 +91,14 @@ const UserSettings: React.FC = () => {
   const [statusText, setStatusText] = useState(customStatus.text || '');
   const [statusEmoji, setStatusEmoji] = useState(customStatus.emoji || '');
   const [showStatusEmojis, setShowStatusEmojis] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Check notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
 
   const toggleSettings = () => {
     setIsOpen(!isOpen);
@@ -181,6 +189,13 @@ const UserSettings: React.FC = () => {
     const updated = { ...notificationSettings, [key]: value };
     setNotificationSettingsState(updated);
     setNotificationSettings(updated);
+    
+    // Request permission if notifications are being enabled
+    if (key === 'enabled' && value && 'Notification' in window) {
+      Notification.requestPermission().then((permission) => {
+        setNotificationPermission(permission);
+      });
+    }
   };
 
   const handleChatSettingChange = (key: string, value: any) => {
@@ -268,29 +283,29 @@ const UserSettings: React.FC = () => {
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 max-w-[90vw] max-h-[80vh] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform animate-in slide-in-from-top-2 z-50 flex flex-col">
+        <div className="absolute right-0 top-full mt-2 w-96 max-w-[90vw] max-h-[85vh] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 transform animate-in slide-in-from-top-2 z-50 flex flex-col">
           {/* Tab Navigation */}
-          <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-200 dark:border-gray-700">
+          <div className="flex overflow-x-auto scrollbar-hide border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 px-3 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 border-b-2 ${
+                  className={`flex items-center gap-1 px-2 py-3 text-xs font-medium whitespace-nowrap transition-all duration-200 border-b-2 flex-shrink-0 ${
                     activeTab === tab.id
                       ? 'border-violet-500 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20'
                       : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
                   <Icon size={16} />
-                  <span className="hidden sm:inline">{tab.name}</span>
+                  <span>{tab.name}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="p-4 overflow-y-auto flex-1 scrollbar-hide">
+          <div className="p-4 overflow-y-auto flex-1 scrollbar-hide min-h-0">
             {activeTab === 'profile' && (
               <form onSubmit={handleSubmit}>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -521,13 +536,29 @@ const UserSettings: React.FC = () => {
                 <div className="space-y-4">
                   <label className="flex items-center justify-between">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Enable Notifications</span>
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.enabled}
-                      onChange={(e) => handleNotificationChange('enabled', e.target.checked)}
-                      className="rounded text-violet-600 focus:ring-violet-500"
-                    />
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={notificationSettings.enabled}
+                        onChange={(e) => handleNotificationChange('enabled', e.target.checked)}
+                        className="rounded text-violet-600 focus:ring-violet-500"
+                      />
+                      {notificationPermission === 'denied' && (
+                        <span className="text-xs text-red-500">Blocked</span>
+                      )}
+                      {notificationPermission === 'granted' && notificationSettings.enabled && (
+                        <span className="text-xs text-green-500">Active</span>
+                      )}
+                    </div>
                   </label>
+                  
+                  {notificationPermission === 'denied' && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        Notifications are blocked. Please enable them in your browser settings.
+                      </p>
+                    </div>
+                  )}
                   
                   <label className="flex items-center justify-between">
                     <span className="text-sm text-gray-700 dark:text-gray-300">Sound Notifications</span>
@@ -535,6 +566,7 @@ const UserSettings: React.FC = () => {
                       type="checkbox"
                       checked={notificationSettings.sound}
                       onChange={(e) => handleNotificationChange('sound', e.target.checked)}
+                      disabled={!notificationSettings.enabled}
                       className="rounded text-violet-600 focus:ring-violet-500"
                     />
                   </label>
@@ -545,6 +577,18 @@ const UserSettings: React.FC = () => {
                       type="checkbox"
                       checked={notificationSettings.desktop}
                       onChange={(e) => handleNotificationChange('desktop', e.target.checked)}
+                      disabled={!notificationSettings.enabled || notificationPermission !== 'granted'}
+                      className="rounded text-violet-600 focus:ring-violet-500"
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Mention Notifications</span>
+                    <input
+                      type="checkbox"
+                      checked={notificationSettings.mentions}
+                      onChange={(e) => handleNotificationChange('mentions', e.target.checked)}
+                      disabled={!notificationSettings.enabled}
                       className="rounded text-violet-600 focus:ring-violet-500"
                     />
                   </label>
@@ -561,8 +605,16 @@ const UserSettings: React.FC = () => {
                       step="0.1"
                       value={notificationSettings.soundVolume}
                       onChange={(e) => handleNotificationChange('soundVolume', parseFloat(e.target.value))}
+                      disabled={!notificationSettings.enabled || !notificationSettings.sound}
                       className="w-full"
                     />
+                    <button
+                      onClick={() => notificationManager.playNotificationSound(notificationSettings.soundVolume)}
+                      disabled={!notificationSettings.enabled || !notificationSettings.sound}
+                      className="mt-2 px-3 py-1 bg-violet-600 text-white rounded text-xs hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Test Sound
+                    </button>
                   </div>
                 </div>
               </div>
