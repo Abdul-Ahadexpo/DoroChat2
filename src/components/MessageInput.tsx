@@ -4,6 +4,7 @@ import { sendMessage, sendVoiceNote, deleteVoiceNote, setTypingIndicator, remove
 import { uploadImage } from '../utils/imgbb';
 import { MessageType } from '../utils/types';
 import { saveVoiceNote } from '../utils/storage';
+import { isYouTubeUrl } from '../utils/youtube';
 import { Send, Image, Mic, MicOff, Smile, MoreHorizontal, X, Video } from 'lucide-react';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
@@ -47,6 +48,10 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     
     if (message.trim() === '') return;
     
+    // Check if message contains a YouTube URL
+    const messageContent = message.trim();
+    const messageType = isYouTubeUrl(messageContent) ? MessageType.YOUTUBE : MessageType.TEXT;
+    
     try {
       await sendMessage(roomId, {
         senderId: user.id,
@@ -54,8 +59,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
         senderColor: user.color,
         senderFontStyle: user.fontStyle,
         senderProfileImage: user.profileImage,
-        content: message,
-        type: MessageType.TEXT,
+        content: messageContent,
+        type: messageType,
         replyTo: replyTo ? {
           id: replyTo.id,
           content: replyTo.content,
