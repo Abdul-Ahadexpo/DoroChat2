@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { sendMessage, sendVoiceNote, deleteVoiceNote, setTypingIndicator, removeTypingIndicator } from '../services/firebase';
 import { uploadImage } from '../utils/imgbb';
@@ -34,6 +34,84 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const recorderControls = useAudioRecorder();
+
+  // Handle clipboard paste events
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      // Only handle paste if the textarea is focused
+      if (document.activeElement !== textareaRef.current) return;
+      
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      // Look for image items in clipboard
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        if (item.type.startsWith('image/')) {
+          e.preventDefault(); // Prevent default paste behavior
+          
+          const file = item.getAsFile();
+          if (!file) continue;
+          
+          // Check file size (20MB limit)
+          if (file.size > 20 * 1024 * 1024) {
+            alert('Image size should be less than 20MB');
+            return;
+          }
+          
+          // Upload the pasted image
+          setIsUploading(true);
+          setUploadProgress(0);
+          setShowTools(false);
+          
+          // Simulate upload progress
+          const progressInterval = setInterval(() => {
+            setUploadProgress(prev => Math.min(prev + Math.random() * 15, 95));
+          }, 200);
+          
+          try {
+            const imageUrl = await uploadImage(file);
+            setUploadProgress(100);
+            
+            await sendMessage(roomId, {
+              senderId: user.id,
+              senderName: user.name,
+              senderColor: user.color,
+              senderFontStyle: user.fontStyle,
+              senderProfileImage: user.profileImage,
+              content: imageUrl,
+              type: MessageType.IMAGE,
+              replyTo: replyTo ? {
+                id: replyTo.id,
+                content: replyTo.content,
+                senderName: replyTo.senderName
+              } : null
+            });
+            
+            if (onCancelReply) onCancelReply();
+          } catch (error) {
+            console.error('Error uploading pasted image:', error);
+            alert(`Failed to upload image: ${error.message}`);
+          } finally {
+            clearInterval(progressInterval);
+            setIsUploading(false);
+            setUploadProgress(0);
+          }
+          
+          break; // Only handle the first image found
+        }
+      }
+    };
+    
+    // Add event listener to document
+    document.addEventListener('paste', handlePaste);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [roomId, user, replyTo, onCancelReply]);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -319,6 +397,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
                 handleSendMessage(e);
               }
             }}
+            title="Type a message or paste an image from clipboard"
           />
         </div>
         

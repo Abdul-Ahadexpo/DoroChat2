@@ -49,10 +49,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     if (lastMessage.senderId === user.id) return;
     if (Date.now() - lastMessage.timestamp > 5000) return; // Ignore messages older than 5 seconds
     
+    // Only process text messages with valid content
+    if (lastMessage.type !== MessageType.TEXT || !lastMessage.content) return;
+    
     const settings = getNotificationSettings();
     
     // Check if user is mentioned
-    const isMentioned = lastMessage.content.toLowerCase().includes(user.name.toLowerCase());
+    const isMentioned = lastMessage.content.toLowerCase().includes(user.name?.toLowerCase() || '');
     
     if (isMentioned) {
       notificationManager.notifyMention(lastMessage.senderName, lastMessage.content, settings);
