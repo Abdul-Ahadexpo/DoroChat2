@@ -5,6 +5,7 @@ import { saveRoom, removeSavedRoom, isRoomSaved } from '../utils/storage';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import TypingIndicator from './TypingIndicator';
+import LiveYouTubePlayer from './LiveYouTubePlayer';
 import { Message, TypingIndicator as TypingIndicatorType } from '../utils/types';
 import { Bookmark, BookmarkCheck } from 'lucide-react';
 
@@ -90,6 +91,9 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, roomName, isPrivate, passwo
           </button>
         </div>
       </div>
+      
+      {/* Live YouTube Player */}
+      <LiveYouTubePlayer roomId={roomId} />
       
       {loading ? (
         <div className="flex-1 flex items-center justify-center transition-all duration-500">

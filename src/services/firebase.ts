@@ -236,6 +236,29 @@ export const removeUserStatus = async (userId: string) => {
   await remove(statusRef);
 };
 
+// Live YouTube video functions
+export const setLiveVideoState = async (roomId: string, videoState: LiveVideoState) => {
+  const liveVideoRef = ref(database, `liveVideos/${roomId}`);
+  await set(liveVideoRef, {
+    ...videoState,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getLiveVideoState = (roomId: string, callback: (state: LiveVideoState | null) => void) => {
+  const liveVideoRef = ref(database, `liveVideos/${roomId}`);
+  
+  onValue(liveVideoRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(data || null);
+  });
+};
+
+export const removeLiveVideoState = async (roomId: string) => {
+  const liveVideoRef = ref(database, `liveVideos/${roomId}`);
+  await remove(liveVideoRef);
+};
+
 export default {
   database,
   createChatRoom,
@@ -257,4 +280,7 @@ export default {
   getUserStatus,
   getAllUserStatuses,
   removeUserStatus,
+  setLiveVideoState,
+  getLiveVideoState,
+  removeLiveVideoState,
 };

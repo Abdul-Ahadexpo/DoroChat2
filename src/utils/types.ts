@@ -23,7 +23,8 @@ export enum MessageType {
   TEXT = 'text',
   IMAGE = 'image',
   VOICE = 'voice',
-  YOUTUBE = 'youtube'
+  YOUTUBE = 'youtube',
+  LIVE_YOUTUBE_INITIATE = 'live_youtube_initiate'
 }
 
 export interface Message {
@@ -69,4 +70,14 @@ export interface ReadReceipt {
   userId: string;
   userName: string;
   timestamp: number;
+}
+
+export interface LiveVideoState {
+  videoId: string;
+  startedAt: number;
+  currentPlaybackTime: number;
+  isPlaying: boolean;
+  initiatedBy: string;
+  initiatedByName: string;
+  title?: string;
 }

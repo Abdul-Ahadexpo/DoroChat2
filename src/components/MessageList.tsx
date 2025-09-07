@@ -399,6 +399,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     {message.type === MessageType.YOUTUBE && (
                       <YouTubeEmbed url={message.content} />
                     )}
+                    
+                    {message.type === MessageType.LIVE_YOUTUBE_INITIATE && (
+                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-red-600 dark:text-red-400 text-lg">🔴</span>
+                          <span className="text-red-700 dark:text-red-300 font-medium">
+                            Live video session started
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

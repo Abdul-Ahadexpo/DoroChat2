@@ -27,6 +27,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
   const [recordingTime, setRecordingTime] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showTools, setShowTools] = useState(false);
+  const [showYouTubeOptions, setShowYouTubeOptions] = useState(false);
+  const [pendingYouTubeUrl, setPendingYouTubeUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -126,7 +128,97 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
     
     if (message.trim() === '') return;
     
+    const messageContent = message.trim();
+    
     // Check if message contains a YouTube URL
+    if (isYouTubeUrl(messageContent)) {
+      setPendingYouTubeUrl(messageContent);
+      setShowYouTubeOptions(true);
+      return;
+    }
+    
+    await sendRegularMessage(messageContent, MessageType.TEXT);
+  };
+
+  const sendRegularMessage = async (content: string, type: MessageType) => {
+    try {
+      await sendMessage(roomId, {
+        senderId: user.id,
+        senderName: user.name,
+        senderColor: user.color,
+        senderFontStyle: user.fontStyle,
+        senderProfileImage: user.profileImage,
+        content: content,
+        type: type,
+        replyTo: replyTo ? {
+          id: replyTo.id,
+          content: replyTo.content,
+          senderName: replyTo.senderName
+        } : null
+      });
+      
+      setMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+      removeTypingIndicator(roomId, user.id);
+      if (onCancelReply) onCancelReply();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  const handleYouTubePlayLive = async () => {
+    const { extractYouTubeId } = await import('../utils/youtube');
+    const videoId = extractYouTubeId(pendingYouTubeUrl);
+    
+    if (!videoId) {
+      alert('Invalid YouTube URL');
+      return;
+    }
+
+    try {
+      // Set live video state
+      const { setLiveVideoState } = await import('../services/firebase');
+      await setLiveVideoState(roomId, {
+        videoId,
+        startedAt: Date.now(),
+        currentPlaybackTime: 0,
+        isPlaying: true,
+        initiatedBy: user.id,
+        initiatedByName: user.name,
+      });
+
+      // Send notification message
+      await sendRegularMessage(
+        `🔴 Started a live video session: ${pendingYouTubeUrl}`,
+        MessageType.LIVE_YOUTUBE_INITIATE
+      );
+    } catch (error) {
+      console.error('Error starting live video:', error);
+      alert('Failed to start live video session');
+    }
+
+    setShowYouTubeOptions(false);
+    setPendingYouTubeUrl('');
+  };
+
+  const handleYouTubeSendLink = async () => {
+    await sendRegularMessage(pendingYouTubeUrl, MessageType.YOUTUBE);
+    setShowYouTubeOptions(false);
+    setPendingYouTubeUrl('');
+  };
+
+  const handleYouTubeCancel = () => {
+    setShowYouTubeOptions(false);
+    setPendingYouTubeUrl('');
+  };
+
+  const handleSendMessageOld = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (message.trim() === '') return;
+    
     const messageContent = message.trim();
     const messageType = isYouTubeUrl(messageContent) ? MessageType.YOUTUBE : MessageType.TEXT;
     
@@ -521,6 +613,45 @@ const MessageInput: React.FC<MessageInputProps> = ({ roomId, replyTo, onCancelRe
           recorderControls={recorderControls}
         />
       </div>
+      
+      {/* YouTube Options Modal */}
+      {showYouTubeOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 font-comic">
+              YouTube Video Options
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              How would you like to share this YouTube video?
+            </p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handleYouTubePlayLive}
+                className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                <span className="text-lg">🔴</span>
+                <span>Play Live (Everyone watches together)</span>
+              </button>
+              
+              <button
+                onClick={handleYouTubeSendLink}
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                <span className="text-lg">🔗</span>
+                <span>Send as Link (Individual viewing)</span>
+              </button>
+              
+              <button
+                onClick={handleYouTubeCancel}
+                className="w-full bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-800 dark:text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
