@@ -259,6 +259,54 @@ export const removeLiveVideoState = async (roomId: string) => {
   await remove(liveVideoRef);
 };
 
+// Device tracking functions
+export const registerDevice = async (deviceData: any) => {
+  const devicesRef = ref(database, `devices/${deviceData.fingerprint}`);
+  await set(devicesRef, {
+    ...deviceData,
+    lastSeen: serverTimestamp(),
+  });
+};
+
+export const updateDeviceActivity = async (fingerprint: string, roomId: string, roomName: string) => {
+  const deviceRef = ref(database, `devices/${fingerprint}`);
+  const snapshot = await get(deviceRef);
+  
+  if (snapshot.exists()) {
+    const deviceData = snapshot.val();
+    const roomVisits = deviceData.roomVisits || {};
+    
+    if (!roomVisits[roomId]) {
+      roomVisits[roomId] = {
+        roomName,
+        visits: []
+      };
+    }
+    
+    roomVisits[roomId].visits.push(Date.now());
+    roomVisits[roomId].roomName = roomName;
+    
+    await update(deviceRef, {
+      roomVisits,
+      lastSeen: serverTimestamp(),
+    });
+  }
+};
+
+export const getAllDevices = (callback: (devices: any[]) => void) => {
+  const devicesRef = ref(database, 'devices');
+  
+  onValue(devicesRef, (snapshot) => {
+    const data = snapshot.val();
+    const devices = data ? Object.entries(data).map(([fingerprint, device]) => ({
+      fingerprint,
+      ...device as object
+    })) : [];
+    
+    callback(devices);
+  });
+};
+
 export default {
   database,
   createChatRoom,
@@ -283,4 +331,7 @@ export default {
   setLiveVideoState,
   getLiveVideoState,
   removeLiveVideoState,
+  registerDevice,
+  updateDeviceActivity,
+  getAllDevices,
 };
