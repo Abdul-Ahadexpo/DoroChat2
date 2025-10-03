@@ -106,6 +106,15 @@ export const editMessage = async (roomId: string, messageId: string, newContent:
   });
 };
 
+export const adminEditMessage = async (roomId: string, messageId: string, newContent: string) => {
+  const messageRef = ref(database, `messages/${roomId}/${messageId}`);
+  
+  // Admin edit doesn't add editedAt timestamp to hide the edit indicator
+  await update(messageRef, {
+    content: newContent,
+  });
+};
+
 export const deleteMessage = async (roomId: string, messageId: string) => {
   const messageRef = ref(database, `messages/${roomId}/${messageId}`);
   await remove(messageRef);
@@ -234,6 +243,20 @@ export const getAllUserStatuses = (callback: (statuses: { [userId: string]: any 
 export const removeUserStatus = async (userId: string) => {
   const statusRef = ref(database, `userStatuses/${userId}`);
   await remove(statusRef);
+};
+
+// Message reactions
+export const addReaction = async (roomId: string, messageId: string, emoji: string, userId: string, userName: string) => {
+  const reactionRef = ref(database, `messages/${roomId}/${messageId}/reactions/${emoji}/${userId}`);
+  await set(reactionRef, {
+    userName,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const removeReaction = async (roomId: string, messageId: string, emoji: string, userId: string) => {
+  const reactionRef = ref(database, `messages/${roomId}/${messageId}/reactions/${emoji}/${userId}`);
+  await remove(reactionRef);
 };
 
 // Live YouTube video functions

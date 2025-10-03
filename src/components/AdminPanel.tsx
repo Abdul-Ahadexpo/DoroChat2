@@ -4,31 +4,14 @@ import {
   getChatRooms, 
   getMessages, 
   deleteMessage, 
+  adminEditMessage,
   deleteRoom,
   database,
   getAllDevices
 } from '../services/firebase';
 import { ref, remove, get } from 'firebase/database';
 import { ChatRoom, Message, MessageType } from '../utils/types';
-import { 
-  Shield, 
-  Trash2, 
-  Eye, 
-  Lock, 
-  Unlock, 
-  MessageSquare, 
-  Download, 
-  Play, 
-  Pause, 
-  Volume2,
-  Users,
-  Calendar,
-  Clock,
-  User,
-  Monitor,
-  Smartphone,
-  MapPin
-} from 'lucide-react';
+import { Shield, Trash2, Eye, Lock, Unlock, MessageSquare, Download, Play, Pause, Volume2, Users, Calendar, Clock, User, Monitor, Smartphone, MapPin, CreditCard as Edit, Check, X } from 'lucide-react';
 
 interface VoiceMessage {
   id: string;
@@ -51,6 +34,8 @@ const AdminPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<{ [key: string]: HTMLAudioElement }>({});
+  const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
   const { user } = useUser();
 
   useEffect(() => {
@@ -212,6 +197,36 @@ const AdminPanel: React.FC = () => {
         alert('Failed to delete voice message');
       }
     }
+  };
+
+  const handleAdminEditMessage = async (roomId: string, messageId: string) => {
+    if (editContent.trim() === '') return;
+    
+    try {
+      await adminEditMessage(roomId, messageId, editContent.trim());
+      setEditingMessage(null);
+      setEditContent('');
+      
+      // Refresh messages if this room is currently selected
+      if (selectedRoom?.id === roomId) {
+        loadRoomMessages(selectedRoom);
+      }
+      
+      alert('Message edited successfully!');
+    } catch (error) {
+      console.error('Error editing message:', error);
+      alert('Failed to edit message');
+    }
+  };
+
+  const startEditingMessage = (message: Message) => {
+    setEditingMessage(message.id);
+    setEditContent(message.content);
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessage(null);
+    setEditContent('');
   };
 
   const formatTime = (timestamp: number) => {
@@ -396,19 +411,60 @@ const AdminPanel: React.FC = () => {
                                 {message.type}
                               </span>
                             </div>
-                            <button
-                              onClick={() => deleteMessage(selectedRoom.id, message.id)}
-                              className="text-red-400 hover:text-red-300"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex items-center space-x-2">
+                              {message.type === MessageType.TEXT && (
+                                <button
+                                  onClick={() => startEditingMessage(message)}
+                                  className="text-blue-400 hover:text-blue-300"
+                                  title="Edit message"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteMessage(selectedRoom.id, message.id)}
+                                className="text-red-400 hover:text-red-300"
+                                title="Delete message"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-300">
-                            {message.type === MessageType.TEXT && message.content}
-                            {message.type === MessageType.IMAGE && '📷 Image'}
-                            {message.type === MessageType.VOICE && '🎤 Voice Message'}
-                            {message.type === MessageType.YOUTUBE && '📺 YouTube Video'}
-                          </div>
+                          
+                          {editingMessage === message.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-blue-400 focus:outline-none resize-none"
+                                rows={3}
+                                placeholder="Edit message content..."
+                              />
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleAdminEditMessage(selectedRoom.id, message.id)}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                                >
+                                  <Check size={14} />
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  onClick={cancelEditingMessage}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                                >
+                                  <X size={14} />
+                                  <span>Cancel</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-300">
+                              {message.type === MessageType.TEXT && message.content}
+                              {message.type === MessageType.IMAGE && '📷 Image'}
+                              {message.type === MessageType.VOICE && '🎤 Voice Message'}
+                              {message.type === MessageType.YOUTUBE && '📺 YouTube Video'}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

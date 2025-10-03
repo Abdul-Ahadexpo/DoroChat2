@@ -44,6 +44,7 @@ export interface Message {
     senderName: string;
   } | null;
   seenBy?: { [userId: string]: number };
+  reactions?: { [emoji: string]: { [userId: string]: { userName: string; timestamp: number } } };
 }
 
 export interface VoiceNote {
