@@ -106,6 +106,15 @@ export const editMessage = async (roomId: string, messageId: string, newContent:
   });
 };
 
+export const adminEditMessage = async (roomId: string, messageId: string, newContent: string) => {
+  const messageRef = ref(database, `messages/${roomId}/${messageId}`);
+  
+  // Admin edit doesn't add editedAt timestamp to hide the edit indicator
+  await update(messageRef, {
+    content: newContent,
+  });
+};
+
 export const deleteMessage = async (roomId: string, messageId: string) => {
   const messageRef = ref(database, `messages/${roomId}/${messageId}`);
   await remove(messageRef);
