@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../utils/types';
 import { Heart, Smile, ThumbsUp, Reply, MoreVertical, CreditCard as Edit, Trash2 } from 'lucide-react';
-import { updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { addReaction, removeReaction, deleteMessage } from '../services/firebase';
 import { useUser } from '../contexts/UserContext';
 import ImageMessage from './ImageMessage';
 import YouTubeEmbed from './YouTubeEmbed';
@@ -31,75 +30,37 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const handleReaction = async (messageId: string, emoji: string) => {
     if (!user) return;
 
-    const messageRef = doc(db, 'rooms', roomId, 'messages', messageId);
-    const message = messages.find(m => m.id === messageId);
-    
-    if (!message) return;
+    try {
+      const message = messages.find(m => m.id === messageId);
+      if (!message) return;
 
-    const existingReaction = message.reactions?.find(r => r.emoji === emoji);
-    
-    if (existingReaction) {
-      if (existingReaction.users.includes(user.id)) {
-        // Remove user from reaction
-        const updatedUsers = existingReaction.users.filter(id => id !== user.id);
-        if (updatedUsers.length === 0) {
-          // Remove entire reaction if no users left
-          await updateDoc(messageRef, {
-            reactions: arrayRemove(existingReaction)
-          });
-        } else {
-          // Update reaction with remaining users
-          await updateDoc(messageRef, {
-            reactions: arrayRemove(existingReaction)
-          });
-          await updateDoc(messageRef, {
-            reactions: arrayUnion({
-              emoji,
-              users: updatedUsers,
-              count: updatedUsers.length
-            })
-          });
-        }
+      // Check if user already reacted with this emoji
+      const userAlreadyReacted = message.reactions && 
+        message.reactions[emoji] && 
+        message.reactions[emoji][user.id];
+
+      if (userAlreadyReacted) {
+        // Remove reaction
+        await removeReaction(roomId, messageId, emoji, user.id, user.name);
       } else {
-        // Add user to existing reaction
-        const updatedReaction = {
-          emoji,
-          users: [...existingReaction.users, user.id],
-          count: existingReaction.count + 1
-        };
-        await updateDoc(messageRef, {
-          reactions: arrayRemove(existingReaction)
-        });
-        await updateDoc(messageRef, {
-          reactions: arrayUnion(updatedReaction)
-        });
+        // Add reaction
+        await addReaction(roomId, messageId, emoji, user.id, user.name);
       }
-    } else {
-      // Create new reaction
-      await updateDoc(messageRef, {
-        reactions: arrayUnion({
-          emoji,
-          users: [user.id],
-          count: 1
-        })
-      });
+      
+      setShowEmojiPicker(null);
+    } catch (error) {
+      console.error('Error handling reaction:', error);
     }
-    
-    setShowEmojiPicker(null);
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!user) return;
     
     const message = messages.find(m => m.id === messageId);
-    if (!message || message.userId !== user.id) return;
+    if (!message || message.senderId !== user.id) return;
 
     try {
-      const messageRef = doc(db, 'rooms', roomId, 'messages', messageId);
-      await updateDoc(messageRef, {
-        deleted: true,
-        content: '[Message deleted]'
-      });
+      await deleteMessage(roomId, messageId);
       setShowDropdown(null);
     } catch (error) {
       console.error('Error deleting message:', error);
@@ -128,25 +89,21 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
 
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const renderMessageContent = (message: Message) => {
-    if (message.deleted) {
-      return <span className="italic text-gray-500">[Message deleted]</span>;
+    if (message.type === 'image') {
+      return <ImageMessage imageUrl={message.content} />;
     }
 
-    if (message.type === 'image' && message.imageUrl) {
-      return <ImageMessage imageUrl={message.imageUrl} />;
+    if (message.type === 'youtube') {
+      return <YouTubeEmbed url={message.content} />;
     }
 
-    if (message.type === 'youtube' && message.youtubeUrl) {
-      return <YouTubeEmbed url={message.youtubeUrl} />;
-    }
-
-    if (message.type === 'voice' && message.voiceUrl) {
-      return <VoiceNotePlayer voiceUrl={message.voiceUrl} />;
+    if (message.type === 'voice') {
+      return <VoiceNotePlayer roomId={roomId} voiceNoteId={message.id} audioUrl={message.content} />;
     }
 
     return <span>{message.content}</span>;
@@ -157,25 +114,25 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
       {messages.map((message) => (
         <div
           key={message.id}
-          className={`flex ${message.userId === user?.id ? 'justify-end' : 'justify-start'}`}
+          className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
         >
           <div
             className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative group ${
-              message.userId === user?.id
+              message.senderId === user?.id
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
             }`}
           >
             {message.replyTo && (
               <div className="mb-2 p-2 bg-black bg-opacity-20 rounded text-sm">
-                <div className="font-semibold">{message.replyTo.username}</div>
+                <div className="font-semibold">{message.replyTo.senderName}</div>
                 <div className="opacity-75 truncate">{message.replyTo.content}</div>
               </div>
             )}
             
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="font-semibold text-sm mb-1">{message.username}</div>
+                <div className="font-semibold text-sm mb-1" style={{ color: message.senderId === user?.id ? 'white' : message.senderColor }}>{message.senderName}</div>
                 <div className="break-words">{renderMessageContent(message)}</div>
                 <div className="text-xs opacity-75 mt-1">
                   {formatTimestamp(message.timestamp)}
@@ -200,7 +157,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                   <Smile size={14} />
                 </button>
                 
-                {message.userId === user?.id && (
+                {message.senderId === user?.id && (
                   <button
                     onClick={() => setShowDropdown(showDropdown === message.id ? null : message.id)}
                     className="p-1 hover:bg-black hover:bg-opacity-20 rounded"
@@ -212,37 +169,32 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
               </div>
             </div>
 
-            {/* Quick Reactions */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {quickReactions.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleReaction(message.id, emoji)}
-                  className="text-lg p-1 hover:bg-black hover:bg-opacity-20 rounded transition-colors active:scale-95 touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-
             {/* Reactions Display */}
-            {message.reactions && message.reactions.length > 0 && (
+            {message.reactions && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {message.reactions.map((reaction, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleReaction(message.id, reaction.emoji)}
-                    className={`text-sm px-2 py-1 rounded-full flex items-center space-x-1 transition-colors ${
-                      reaction.users.includes(user?.id || '')
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-                        : 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500'
-                    }`}
-                  >
-                    <span>{reaction.emoji}</span>
-                    <span>{reaction.count}</span>
-                  </button>
-                ))}
+                {Object.entries(message.reactions).map(([emoji, users]) => {
+                  const userIds = Object.keys(users as Record<string, boolean>);
+                  const count = userIds.length;
+                  const userReacted = userIds.includes(user?.id || '');
+                  
+                  if (count === 0) return null;
+                  
+                  return (
+                    <button
+                      key={emoji}
+                      onClick={() => handleReaction(message.id, emoji)}
+                      className={`text-sm px-2 py-1 rounded-full flex items-center space-x-1 transition-colors touch-manipulation min-h-[32px] ${
+                        userReacted
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                          : 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500'
+                      }`}
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <span>{emoji}</span>
+                      <span>{count}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -276,7 +228,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
             )}
 
             {/* Dropdown Menu */}
-            {showDropdown === message.id && message.userId === user?.id && (
+            {showDropdown === message.id && message.senderId === user?.id && (
               <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700 py-1 z-10">
                 <button
                   onClick={() => handleDeleteMessage(message.id)}
