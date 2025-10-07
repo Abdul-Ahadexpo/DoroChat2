@@ -1,510 +1,659 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, MessageCircle, Brain, Users, Download, Upload, CreditCard as Edit2, Save, Zap, Package, Database } from 'lucide-react';
-import { chatService } from '../services/chatService';
-import { FileService } from '../services/fileService';
-import { FileUploadHelp } from './FileUploadHelp';
-import { BotResponse, UnknownQuestion, Message, ProductData, SiteData } from '../types';
+import { useUser } from '../contexts/UserContext';
+import { 
+  getChatRooms, 
+  getMessages, 
+  deleteMessage, 
+  adminEditMessage,
+  deleteRoom,
+  database,
+  getAllDevices
+} from '../services/firebase';
+import { ref, remove, get } from 'firebase/database';
+import { ChatRoom, Message, MessageType } from '../utils/types';
+import { Shield, Trash2, Eye, Lock, Unlock, MessageSquare, Download, Play, Pause, Volume2, Users, Calendar, Clock, User, Monitor, Smartphone, MapPin, CreditCard as Edit, Check, X } from 'lucide-react';
 
-interface AdminPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface VoiceMessage {
+  id: string;
+  roomId: string;
+  roomName: string;
+  senderId: string;
+  senderName: string;
+  senderColor: string;
+  content: string;
+  timestamp: number;
 }
 
-export function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'responses' | 'unknown' | 'messages' | 'quick' | 'products' | 'data'>('responses');
-  const [responses, setResponses] = useState<BotResponse>({});
-  const [unknownQuestions, setUnknownQuestions] = useState<UnknownQuestion[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [quickMessages, setQuickMessages] = useState<string[]>([]);
-  const [products, setProducts] = useState<{ [key: string]: ProductData }>({});
-  const [siteData, setSiteData] = useState<{ [key: string]: SiteData }>({});
-  const [newQuestion, setNewQuestion] = useState('');
-  const [newResponse, setNewResponse] = useState('');
-  const [newQuickMessage, setNewQuickMessage] = useState('');
-  const [newProduct, setNewProduct] = useState<Omit<ProductData, 'id'>>({
-    name: '',
-    price: '',
-    description: '',
-    category: '',
-    inStock: true,
-    imageUrl: '',
-    features: [],
-    specifications: {}
-  });
-  const [newSiteData, setNewSiteData] = useState<Omit<SiteData, 'id' | 'lastUpdated'>>({
-    title: '',
-    content: '',
-    category: 'general',
-    tags: []
-  });
-  const [editingResponse, setEditingResponse] = useState<string | null>(null);
-  const [editQuestion, setEditQuestion] = useState('');
-  const [editResponseText, setEditResponseText] = useState('');
-  const [uploadError, setUploadError] = useState('');
+const AdminPanel: React.FC = () => {
+  const [rooms, setRooms] = useState<ChatRoom[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
+  const [roomMessages, setRoomMessages] = useState<Message[]>([]);
+  const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'voices' | 'devices'>('rooms');
+  const [loading, setLoading] = useState(true);
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [audioElements, setAudioElements] = useState<{ [key: string]: HTMLAudioElement }>({});
+  const [editingMessage, setEditingMessage] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const { user } = useUser();
 
   useEffect(() => {
-    if (!isOpen) return;
+    loadRooms();
+    loadAllVoiceMessages();
+    loadAllDevices();
+  }, []);
 
-    const unsubscribeResponses = chatService.onResponsesChange(setResponses);
-    const unsubscribeUnknown = chatService.onUnknownQuestionsChange(setUnknownQuestions);
-    const unsubscribeMessages = chatService.onMessagesChange(setMessages);
-    const unsubscribeQuick = chatService.onQuickMessagesChange(setQuickMessages);
-
-    return () => {
-      unsubscribeResponses();
-      unsubscribeUnknown();
-      unsubscribeMessages();
-      unsubscribeQuick();
-    };
-  }, [isOpen]);
-
-  const handleAddResponse = async () => {
-    if (newQuestion.trim() && newResponse.trim()) {
-      await chatService.addResponse(newQuestion.trim(), newResponse.trim());
-      setNewQuestion('');
-      setNewResponse('');
-    }
+  const loadRooms = () => {
+    getChatRooms((roomList) => {
+      // Show ALL rooms including hidden ones for admin
+      setRooms(roomList);
+      setLoading(false);
+    });
   };
 
-  const handleAddQuickMessage = async () => {
-    if (newQuickMessage.trim()) {
-      await chatService.addQuickMessage(newQuickMessage.trim());
-      setNewQuickMessage('');
-    }
-  };
-
-  const handleDeleteQuickMessage = async (index: number) => {
-    if (confirm('Are you sure you want to delete this quick message?')) {
-      await chatService.deleteQuickMessage(index);
-    }
-  };
-  const handleDeleteResponse = async (question: string) => {
-    if (confirm('Are you sure you want to delete this response?')) {
-      await chatService.deleteResponse(question);
-    }
-  };
-
-  const handleEditResponse = (question: string, response: string) => {
-    setEditingResponse(question);
-    setEditQuestion(question);
-    setEditResponseText(response);
-  };
-
-  const handleSaveEdit = async () => {
-    if (editQuestion.trim() && editResponseText.trim() && editingResponse) {
-      await chatService.updateResponse(editingResponse, editQuestion.trim(), editResponseText.trim());
-      setEditingResponse(null);
-      setEditQuestion('');
-      setEditResponseText('');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingResponse(null);
-    setEditQuestion('');
-    setEditResponseText('');
-  };
-
-  const handleDownloadUnknown = () => {
-    FileService.downloadUnknownQuestions(unknownQuestions);
-  };
-
-  const handleDownloadResponses = () => {
-    FileService.downloadResponses(responses);
-  };
-
-  const handleUploadResponses = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const loadAllVoiceMessages = async () => {
     try {
-      setUploadError('');
-      const newResponses = await FileService.uploadResponses(file);
-      await chatService.bulkAddResponses(newResponses);
+      const voicesRef = ref(database, 'messages');
+      const snapshot = await get(voicesRef);
       
-      // Reset file input
-      event.target.value = '';
-      
-      alert(`Successfully uploaded ${Object.keys(newResponses).length} responses!`);
+      if (snapshot.exists()) {
+        const allMessages = snapshot.val();
+        const voices: VoiceMessage[] = [];
+        
+        // Get room names for reference
+        const roomsRef = ref(database, 'chatRooms');
+        const roomsSnapshot = await get(roomsRef);
+        const roomsData = roomsSnapshot.exists() ? roomsSnapshot.val() : {};
+        
+        Object.entries(allMessages).forEach(([roomId, messages]: [string, any]) => {
+          const roomName = roomsData[roomId]?.name || 'Unknown Room';
+          
+          Object.entries(messages).forEach(([messageId, message]: [string, any]) => {
+            if (message.type === MessageType.VOICE) {
+              voices.push({
+                id: messageId,
+                roomId,
+                roomName,
+                senderId: message.senderId,
+                senderName: message.senderName,
+                senderColor: message.senderColor,
+                content: message.content,
+                timestamp: message.timestamp
+              });
+            }
+          });
+        });
+        
+        // Sort by room, then sender, then time
+        voices.sort((a, b) => {
+          if (a.roomName !== b.roomName) return a.roomName.localeCompare(b.roomName);
+          if (a.senderName !== b.senderName) return a.senderName.localeCompare(b.senderName);
+          return a.timestamp - b.timestamp;
+        });
+        
+        setVoiceMessages(voices);
+      }
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+      console.error('Error loading voice messages:', error);
     }
   };
 
-  const handleTrainFromUnknown = async (question: string, response: string) => {
-    await chatService.addResponse(question, response);
-    await chatService.deleteUnknownQuestion(question);
+  const loadAllDevices = () => {
+    getAllDevices((deviceList) => {
+      // Sort devices by last seen (most recent first)
+      const sortedDevices = deviceList.sort((a, b) => b.lastSeen - a.lastSeen);
+      setDevices(sortedDevices);
+    });
   };
 
-  const handleClearMessages = async () => {
-    if (confirm('Are you sure you want to clear all messages?')) {
-      await chatService.clearAllMessages();
+  const loadRoomMessages = (room: ChatRoom) => {
+    setSelectedRoom(room);
+    getMessages(room.id, (messages) => {
+      setRoomMessages(messages);
+    });
+  };
+
+  const clearRoomMessages = async (roomId: string) => {
+    if (window.confirm('Are you sure you want to clear ALL messages in this room? This cannot be undone!')) {
+      try {
+        const messagesRef = ref(database, `messages/${roomId}`);
+        await remove(messagesRef);
+        
+        // Reload messages if this room is currently selected
+        if (selectedRoom?.id === roomId) {
+          setRoomMessages([]);
+        }
+        
+        alert('Room messages cleared successfully!');
+      } catch (error) {
+        console.error('Error clearing room messages:', error);
+        alert('Failed to clear room messages');
+      }
     }
   };
 
-  if (!isOpen) return null;
+  const deleteRoomPermanently = async (roomId: string) => {
+    if (window.confirm('Are you sure you want to PERMANENTLY DELETE this room and all its data? This cannot be undone!')) {
+      try {
+        await deleteRoom(roomId);
+        
+        if (selectedRoom?.id === roomId) {
+          setSelectedRoom(null);
+          setRoomMessages([]);
+        }
+        
+        alert('Room deleted permanently!');
+        loadRooms(); // Refresh room list
+      } catch (error) {
+        console.error('Error deleting room:', error);
+        alert('Failed to delete room');
+      }
+    }
+  };
+
+  const playVoiceMessage = (voiceId: string, audioUrl: string) => {
+    // Stop any currently playing audio
+    Object.values(audioElements).forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    
+    if (playingVoice === voiceId) {
+      setPlayingVoice(null);
+      return;
+    }
+    
+    const audio = new Audio(audioUrl);
+    audio.play().then(() => {
+      setPlayingVoice(voiceId);
+      setAudioElements(prev => ({ ...prev, [voiceId]: audio }));
+      
+      audio.onended = () => {
+        setPlayingVoice(null);
+      };
+    }).catch(error => {
+      console.error('Error playing audio:', error);
+    });
+  };
+
+  const downloadVoiceMessage = (audioUrl: string, senderName: string, timestamp: number) => {
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    a.download = `voice-${senderName}-${new Date(timestamp).toISOString()}.wav`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const deleteVoiceMessage = async (voiceMessage: VoiceMessage) => {
+    if (window.confirm(`Delete voice message from ${voiceMessage.senderName}?`)) {
+      try {
+        await deleteMessage(voiceMessage.roomId, voiceMessage.id);
+        loadAllVoiceMessages(); // Refresh voice messages
+        alert('Voice message deleted!');
+      } catch (error) {
+        console.error('Error deleting voice message:', error);
+        alert('Failed to delete voice message');
+      }
+    }
+  };
+
+  const handleAdminEditMessage = async (roomId: string, messageId: string) => {
+    if (editContent.trim() === '') return;
+    
+    try {
+      await adminEditMessage(roomId, messageId, editContent.trim());
+      setEditingMessage(null);
+      setEditContent('');
+      
+      // Refresh messages if this room is currently selected
+      if (selectedRoom?.id === roomId) {
+        loadRoomMessages(selectedRoom);
+      }
+      
+      alert('Message edited successfully!');
+    } catch (error) {
+      console.error('Error editing message:', error);
+      alert('Failed to edit message');
+    }
+  };
+
+  const startEditingMessage = (message: Message) => {
+    setEditingMessage(message.id);
+    setEditContent(message.content);
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessage(null);
+    setEditContent('');
+  };
+
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  const formatDuration = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    return 'Recent';
+  };
+
+  // Group voice messages by room and sender
+  const groupedVoiceMessages = voiceMessages.reduce((acc, voice) => {
+    if (!acc[voice.roomName]) acc[voice.roomName] = {};
+    if (!acc[voice.roomName][voice.senderName]) acc[voice.roomName][voice.senderName] = [];
+    acc[voice.roomName][voice.senderName].push(voice);
+    return acc;
+  }, {} as { [roomName: string]: { [senderName: string]: VoiceMessage[] } });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading Admin Panel...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 z-50 animate-fade-in">
-      <div className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden animate-scale-in">
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 md:p-6 flex items-center justify-between">
-          <h2 className="text-xl md:text-2xl font-bold">Admin Panel</h2>
-          <button
-            onClick={onClose}
-            className="bg-white/20 hover:bg-white/40 p-1.5 md:p-2 rounded-full transition-all duration-200 hover-lift focus-ring"
-          >
-            <X size={20} />
-          </button>
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Header */}
+      <div className="bg-red-800 p-4 shadow-lg">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Shield className="h-8 w-8 text-red-200" />
+            <h1 className="text-2xl font-bold text-red-100">Admin Control Panel</h1>
+          </div>
+          <div className="text-red-200">
+            Logged in as: {user.name} (Admin)
+          </div>
         </div>
+      </div>
 
-        <div className="flex border-b border-gray-700 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('responses')}
-            className={`flex-1 min-w-0 p-2 md:p-4 flex items-center justify-center space-x-1 md:space-x-2 transition-all duration-200 hover-lift ${
-              activeTab === 'responses' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
-            }`}
-          >
-            <Brain size={16} className="md:w-5 md:h-5" />
-            <span className="text-xs md:text-sm">Responses</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('unknown')}
-            className={`flex-1 min-w-0 p-2 md:p-4 flex items-center justify-center space-x-1 md:space-x-2 transition-all duration-200 hover-lift ${
-              activeTab === 'unknown' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
-            }`}
-          >
-            <MessageCircle size={16} className="md:w-5 md:h-5" />
-            <span className="text-xs md:text-sm">Unknown ({unknownQuestions.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('messages')}
-            className={`flex-1 min-w-0 p-2 md:p-4 flex items-center justify-center space-x-1 md:space-x-2 transition-all duration-200 hover-lift ${
-              activeTab === 'messages' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
-            }`}
-          >
-            <Users size={16} className="md:w-5 md:h-5" />
-            <span className="text-xs md:text-sm">Messages ({messages.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('quick')}
-            className={`flex-1 min-w-0 p-2 md:p-4 flex items-center justify-center space-x-1 md:space-x-2 transition-all duration-200 hover-lift ${
-              activeTab === 'quick' ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'
-            }`}
-          >
-            <Zap size={16} className="md:w-5 md:h-5" />
-            <span className="text-xs md:text-sm">Quick ({quickMessages.length})</span>
-          </button>
+      {/* Navigation Tabs */}
+      <div className="bg-gray-800 border-b border-gray-700">
+        <div className="max-w-7xl mx-auto">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('rooms')}
+              className={`py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'rooms'
+                  ? 'border-red-500 text-red-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <MessageSquare className="inline w-5 h-5 mr-2" />
+              Room Management ({rooms.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('voices')}
+              className={`py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'voices'
+                  ? 'border-red-500 text-red-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Volume2 className="inline w-5 h-5 mr-2" />
+              Voice Messages ({voiceMessages.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('devices')}
+              className={`py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'devices'
+                  ? 'border-red-500 text-red-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Monitor className="inline w-5 h-5 mr-2" />
+              Devices ({devices.length})
+            </button>
+          </nav>
         </div>
+      </div>
 
-        <div className="p-3 md:p-6 overflow-y-auto max-h-[70vh] md:max-h-[60vh]">
-          {activeTab === 'responses' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-3 mb-6">
-                <button
-                  onClick={handleDownloadResponses}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-                >
-                  <Download size={16} />
-                  <span>Download Responses</span>
-                </button>
-                <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors cursor-pointer">
-                  <Upload size={16} />
-                  <span>Upload Responses</span>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleUploadResponses}
-                    className="hidden"
-                  />
-                </label>
-                <FileUploadHelp />
-              </div>
-
-              {uploadError && (
-                <div className="bg-red-600 text-white p-3 rounded-lg mb-4">
-                  {uploadError}
-                </div>
-              )}
-
+      <div className="max-w-7xl mx-auto p-6">
+        {activeTab === 'rooms' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Rooms List */}
+            <div className="lg:col-span-1">
               <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-white font-semibold mb-4">Add New Response</h3>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Question/Trigger"
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    className="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
-                  <textarea
-                    placeholder="Response"
-                    value={newResponse}
-                    onChange={(e) => setNewResponse(e.target.value)}
-                    className="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
-                    rows={4}
-                  />
-                  <button
-                    onClick={handleAddResponse}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-                  >
-                    <Plus size={16} />
-                    <span>Add Response</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="text-white font-semibold">Current Responses</h3>
-                {Object.entries(responses).map(([question, response]) => (
-                  <div key={question} className="bg-gray-800 rounded-lg p-4">
-                    {editingResponse === question ? (
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          value={editQuestion}
-                          onChange={(e) => setEditQuestion(e.target.value)}
-                          className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                          placeholder="Question/Trigger"
-                        />
-                        <textarea
-                          value={editResponseText}
-                          onChange={(e) => setEditResponseText(e.target.value)}
-                          className="w-full p-2 rounded bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
-                          placeholder="Response"
-                          rows={4}
-                        />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={handleSaveEdit}
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded flex items-center space-x-1 transition-colors"
-                          >
-                            <Save size={14} />
-                            <span>Save</span>
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-purple-300 font-medium">{question}</span>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleEditResponse(question, response)}
-                              className="text-blue-400 hover:text-blue-300 transition-colors"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteResponse(question)}
-                              className="text-red-400 hover:text-red-300 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                <h2 className="text-xl font-semibold mb-4 text-gray-100">All Rooms</h2>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {rooms.map((room) => (
+                    <div
+                      key={room.id}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedRoom?.id === room.id
+                          ? 'bg-red-700 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                      }`}
+                      onClick={() => loadRoomMessages(room)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium truncate">{room.name}</span>
+                            {room.isPrivate && <Lock size={14} className="text-yellow-400" />}
+                            {room.isHidden && <Eye size={14} className="text-gray-400" />}
+                            {!room.isTemporary && <Shield size={14} className="text-green-400" />}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            Created: {formatTime(room.createdAt)}
                           </div>
                         </div>
-                        <p className="text-gray-300">{response}</p>
-                        <div className="text-gray-300 whitespace-pre-wrap">{response}</div>
-                      </>
+                      </div>
+                      
+                      <div className="flex space-x-2 mt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearRoomMessages(room.id);
+                          }}
+                          className="text-xs bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded text-white"
+                        >
+                          Clear Messages
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteRoomPermanently(room.id);
+                          }}
+                          className="text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded text-white"
+                        >
+                          Delete Room
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Room Details */}
+            <div className="lg:col-span-2">
+              {selectedRoom ? (
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-gray-100">
+                      {selectedRoom.name}
+                    </h2>
+                    <div className="flex items-center space-x-2 text-sm text-gray-400">
+                      <Users size={16} />
+                      <span>Messages: {roomMessages.length}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {roomMessages.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">
+                        No messages in this room
+                      </div>
+                    ) : (
+                      roomMessages.map((message) => (
+                        <div key={message.id} className="bg-gray-700 p-3 rounded">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span 
+                                className="font-medium"
+                                style={{ color: message.senderColor }}
+                              >
+                                {message.senderName}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {formatTime(message.timestamp)}
+                              </span>
+                              <span className="text-xs bg-gray-600 px-2 py-1 rounded">
+                                {message.type}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {message.type === MessageType.TEXT && (
+                                <button
+                                  onClick={() => startEditingMessage(message)}
+                                  className="text-blue-400 hover:text-blue-300"
+                                  title="Edit message"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteMessage(selectedRoom.id, message.id)}
+                                className="text-red-400 hover:text-red-300"
+                                title="Delete message"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {editingMessage === message.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-blue-400 focus:outline-none resize-none"
+                                rows={3}
+                                placeholder="Edit message content..."
+                              />
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleAdminEditMessage(selectedRoom.id, message.id)}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+                                >
+                                  <Check size={14} />
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  onClick={cancelEditingMessage}
+                                  className="flex items-center space-x-1 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+                                >
+                                  <X size={14} />
+                                  <span>Cancel</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-300">
+                              {message.type === MessageType.TEXT && message.content}
+                              {message.type === MessageType.IMAGE && '📷 Image'}
+                              {message.type === MessageType.VOICE && '🎤 Voice Message'}
+                              {message.type === MessageType.YOUTUBE && '📺 YouTube Video'}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-800 rounded-lg p-8 text-center">
+                  <MessageSquare size={48} className="mx-auto text-gray-600 mb-4" />
+                  <p className="text-gray-400">Select a room to view its messages</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'voices' && (
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h2 className="text-xl font-semibold mb-4 text-gray-100">
+              All Voice Messages ({voiceMessages.length})
+            </h2>
+            
+            {Object.keys(groupedVoiceMessages).length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <Volume2 size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No voice messages found</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.entries(groupedVoiceMessages).map(([roomName, senders]) => (
+                  <div key={roomName} className="border border-gray-700 rounded-lg p-4">
+                    <h3 className="text-lg font-medium text-blue-400 mb-3 flex items-center">
+                      <MessageSquare size={20} className="mr-2" />
+                      {roomName}
+                    </h3>
+                    
+                    {Object.entries(senders).map(([senderName, voices]) => (
+                      <div key={senderName} className="mb-4 last:mb-0">
+                        <h4 className="text-md font-medium text-green-400 mb-2 flex items-center">
+                          <User size={16} className="mr-2" />
+                          {senderName} ({voices.length} messages)
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {voices.map((voice) => (
+                            <div key={voice.id} className="bg-gray-700 p-3 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <Clock size={14} className="text-gray-400" />
+                                  <span className="text-xs text-gray-400">
+                                    {formatTime(voice.timestamp)}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {formatDuration(voice.timestamp)}
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => playVoiceMessage(voice.id, voice.content)}
+                                  className={`p-2 rounded-full transition-colors ${
+                                    playingVoice === voice.id
+                                      ? 'bg-red-600 text-white'
+                                      : 'bg-gray-600 hover:bg-gray-500 text-gray-200'
+                                  }`}
+                                >
+                                  {playingVoice === voice.id ? <Pause size={16} /> : <Play size={16} />}
+                                </button>
+                                
+                                <button
+                                  onClick={() => downloadVoiceMessage(voice.content, voice.senderName, voice.timestamp)}
+                                  className="p-2 bg-blue-600 hover:bg-blue-700 rounded-full text-white"
+                                  title="Download"
+                                >
+                                  <Download size={16} />
+                                </button>
+                                
+                                <button
+                                  onClick={() => deleteVoiceMessage(voice)}
+                                  className="p-2 bg-red-600 hover:bg-red-700 rounded-full text-white"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'devices' && (
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h2 className="text-xl font-semibold mb-4 text-gray-100">
+              All Devices ({devices.length})
+            </h2>
+            
+            {devices.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <Monitor size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No devices found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {devices.map((device) => (
+                  <div key={device.fingerprint} className="border border-gray-700 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-blue-600 rounded-lg">
+                          {device.deviceName?.includes('Phone') || device.deviceName?.includes('iPhone') ? (
+                            <Smartphone size={20} className="text-white" />
+                          ) : (
+                            <Monitor size={20} className="text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-blue-400">
+                            {device.deviceName || 'Unknown Device'}
+                          </h3>
+                          <p className="text-sm text-gray-400">
+                            ID: {device.fingerprint}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-gray-400">
+                        <p>Last Seen: {formatTime(device.lastSeen)}</p>
+                        <p>First Visit: {formatTime(device.firstVisit)}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-300">Device Info</h4>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <p><strong>Language:</strong> {device.language}</p>
+                          <p><strong>Screen:</strong> {device.screenResolution}</p>
+                          <p><strong>Timezone:</strong> {device.timezone}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-300">Browser Info</h4>
+                        <div className="text-xs text-gray-400">
+                          <p className="truncate" title={device.userAgent}>
+                            {device.userAgent?.substring(0, 60)}...
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {device.roomVisits && Object.keys(device.roomVisits).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center">
+                          <MapPin size={16} className="mr-2" />
+                          Room Visits ({Object.keys(device.roomVisits).length} rooms)
+                        </h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {Object.entries(device.roomVisits).map(([roomId, roomData]: [string, any]) => (
+                            <div key={roomId} className="bg-gray-700 p-2 rounded">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-green-400 font-medium">
+                                  {roomData.roomName}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {roomData.visits?.length || 0} visits
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Last visit: {formatTime(Math.max(...(roomData.visits || [0])))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {activeTab === 'unknown' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-white font-semibold">Unknown Questions</h3>
-                {unknownQuestions.length > 0 && (
-                  <button
-                    onClick={handleDownloadUnknown}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-                  >
-                    <Download size={14} />
-                    <span>Download JSON</span>
-                  </button>
-                )}
-              </div>
-              {unknownQuestions.map((unknown) => (
-                <UnknownQuestionCard
-                  key={unknown.id}
-                  unknown={unknown}
-                  onTrain={handleTrainFromUnknown}
-                  onDelete={() => chatService.deleteUnknownQuestion(unknown.id)}
-                />
-              ))}
-              {unknownQuestions.length === 0 && (
-                <p className="text-gray-400 text-center py-8">No unknown questions yet!</p>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'messages' && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-white font-semibold">All Messages</h3>
-                <button
-                  onClick={handleClearMessages}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-                >
-                  <Trash2 size={16} />
-                  <span>Clear All</span>
-                </button>
-              </div>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`p-3 rounded-lg ${
-                      message.sender === 'user' ? 'bg-purple-600' : 'bg-gray-700'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-xs text-gray-300 capitalize">{message.sender}</span>
-                      <span className="text-xs text-gray-400">
-                        {new Date(message.timestamp).toLocaleString()}
-                      </span>
-                    </div>
-                    <p className="text-white text-sm">{message.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'quick' && (
-            <div className="space-y-6">
-              <div className="bg-gray-800 rounded-lg p-4">
-                <h3 className="text-white font-semibold mb-4">Add Quick Message</h3>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Quick message text"
-                    value={newQuickMessage}
-                    onChange={(e) => setNewQuickMessage(e.target.value)}
-                    className="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={handleAddQuickMessage}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-                  >
-                    <Plus size={16} />
-                    <span>Add Quick Message</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="text-white font-semibold">Current Quick Messages</h3>
-                {quickMessages.map((message, index) => (
-                  <div key={index} className="bg-gray-800 rounded-lg p-4 flex justify-between items-center">
-                    <span className="text-white">{message}</span>
-                    <button
-                      onClick={() => handleDeleteQuickMessage(index)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                {quickMessages.length === 0 && (
-                  <p className="text-gray-400 text-center py-8">No quick messages yet!</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface UnknownQuestionCardProps {
-  unknown: UnknownQuestion;
-  onTrain: (question: string, response: string) => void;
-  onDelete: () => void;
-}
-
-function UnknownQuestionCard({ unknown, onTrain, onDelete }: UnknownQuestionCardProps) {
-  const [response, setResponse] = useState('');
-  const [isTraining, setIsTraining] = useState(false);
-
-  const handleTrain = () => {
-    if (response.trim()) {
-      onTrain(unknown.question, response.trim());
-      setResponse('');
-      setIsTraining(false);
-    }
-  };
-
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this unknown question?')) {
-      onDelete();
-    }
-  };
-  return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex-1">
-          <p className="text-white font-medium">{unknown.question}</p>
-          <p className="text-gray-400 text-sm">
-            Asked {unknown.count} time{unknown.count !== 1 ? 's' : ''} • {new Date(unknown.timestamp).toLocaleDateString()}
-            {unknown.userID && <span> • User: {unknown.userID}</span>}
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
-            {unknown.count}
-          </span>
-          <button
-            onClick={handleDelete}
-            className="text-red-400 hover:text-red-300 transition-colors"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
-      
-      {isTraining ? (
-        <div className="mt-3 space-y-3">
-          <textarea
-            placeholder="Type the response for this question..."
-            value={response}
-            onChange={(e) => setResponse(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
-            rows={3}
-          />
-          <div className="flex space-x-2">
-            <button
-              onClick={handleTrain}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Train
-            </button>
-            <button
-              onClick={() => setIsTraining(false)}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
+            )}
           </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setIsTraining(true)}
-          className="mt-3 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
-        >
-          <Brain size={16} />
-          Train Response
-        </button>
-      )}
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default AdminPanel;

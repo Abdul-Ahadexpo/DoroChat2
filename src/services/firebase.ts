@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 import { getDatabase, ref, set, push, onValue, remove, update, get, serverTimestamp } from 'firebase/database';
 
 const firebaseConfig = {
@@ -12,6 +13,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 export const database = getDatabase(app);
 
 export const createChatRoom = async (roomData: {
