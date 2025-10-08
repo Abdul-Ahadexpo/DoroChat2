@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../utils/types';
 import { Heart, Smile, ThumbsUp, Reply, MoreVertical, CreditCard as Edit, Trash2 } from 'lucide-react';
-import { addReaction, removeReaction, deleteMessage } from '../services/firebase';
+import { addReaction, removeReaction, deleteMessage, markMessageAsSeen, updateLastSeenMessage } from '../services/firebase';
 import { useUser } from '../contexts/UserContext';
 import ImageMessage from './ImageMessage';
 import YouTubeEmbed from './YouTubeEmbed';
@@ -25,6 +25,69 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
 
   useEffect(() => {
     scrollToBottom();
+    
+    // Mark messages as seen when they come into view
+    if (messages.length > 0 && user?.id && user?.name) {
+      messages.forEach(message => {
+        if (message.senderId !== user.id) {
+          // Mark message as seen by this user
+          markMessageAsSeen(roomId, message.id, user.id, user.name).catch(console.error);
+        }
+      });
+      
+      // Update last seen message for this user
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        updateLastSeenMessage(roomId, user.id, lastMessage.id).catch(console.error);
+      }
+    }
+  }, [messages, roomId, user?.id, user?.name]);
+
+  const getSeenByText = (message: Message) => {
+    if (!message.seenBy || message.senderId !== user?.id) return '';
+    
+    const seenEntries = Object.entries(message.seenBy).filter(([userId]) => userId !== message.senderId);
+    const seenCount = seenEntries.length;
+    
+    if (seenCount === 0) return '';
+    
+    if (seenCount === 1) {
+      return 'Seen by 1';
+    } else {
+      return `Seen by ${seenCount}`;
+    }
+  };
+
+  const getSeenByDetails = (message: Message) => {
+    if (!message.seenBy || message.senderId !== user?.id) return null;
+    
+    const seenEntries = Object.entries(message.seenBy)
+      .filter(([userId]) => userId !== message.senderId)
+      .map(([userId, timestamp]) => ({ userId, timestamp: timestamp as number }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (seenEntries.length === 0) return null;
+    
+    return seenEntries.map(entry => ({
+      userId: entry.userId,
+      time: new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+  };
+
+  const [showSeenDetails, setShowSeenDetails] = useState<string | null>(null);
+
+  useEffect(() => {
+    scrollToBottom();
+    
+    // Mark visible messages as seen
+    if (messages.length > 0 && user?.id) {
+      // Mark all visible messages as seen (not sent by current user)
+      messages.forEach(message => {
+        if (message.senderId !== user.id) {
+          markMessageAsSeen(roomId, message.id, user.id).catch(console.error);
+        }
+      });
+    }
   }, [messages]);
 
   const handleReaction = async (messageId: string, emoji: string) => {
@@ -137,6 +200,11 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                 <div className="text-xs opacity-75 mt-1">
                   {formatTimestamp(message.timestamp)}
                 </div>
+                {message.senderId === user?.id && getSeenByText(message) && (
+                  <div className="text-xs opacity-60 mt-1 text-blue-500">
+                    {getSeenByText(message)}
+                  </div>
+                )}
               </div>
               
               {/* Message Actions */}
@@ -195,6 +263,19 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Seen Details Popup */}
+            {showSeenDetails === message.id && getSeenByDetails(message).length > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-20 min-w-40">
+                <div className="font-semibold mb-1">Seen by:</div>
+                {getSeenByDetails(message).map((seen, index) => (
+                  <div key={index} className="flex justify-between items-center mb-1">
+                    <span className="truncate mr-2">{seen.userName}</span>
+                    <span className="ml-2 opacity-75">{seen.time}</span>
+                  </div>
+                ))}
               </div>
             )}
 
