@@ -4,14 +4,27 @@ import {
   getChatRooms, 
   getMessages, 
   deleteMessage, 
-  adminEditMessage,
   deleteRoom,
-  database,
-  getAllDevices
+  database 
 } from '../services/firebase';
 import { ref, remove, get } from 'firebase/database';
 import { ChatRoom, Message, MessageType } from '../utils/types';
-import { Shield, Trash2, Eye, Lock, Unlock, MessageSquare, Download, Play, Pause, Volume2, Users, Calendar, Clock, User, Monitor, Smartphone, MapPin, CreditCard as Edit, Check, X } from 'lucide-react';
+import { 
+  Shield, 
+  Trash2, 
+  Eye, 
+  Lock, 
+  Unlock, 
+  MessageSquare, 
+  Download, 
+  Play, 
+  Pause, 
+  Volume2,
+  Users,
+  Calendar,
+  Clock,
+  User
+} from 'lucide-react';
 
 interface VoiceMessage {
   id: string;
@@ -29,19 +42,15 @@ const AdminPanel: React.FC = () => {
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [roomMessages, setRoomMessages] = useState<Message[]>([]);
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]);
-  const [devices, setDevices] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'voices' | 'devices'>('rooms');
+  const [activeTab, setActiveTab] = useState<'rooms' | 'voices'>('rooms');
   const [loading, setLoading] = useState(true);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<{ [key: string]: HTMLAudioElement }>({});
-  const [editingMessage, setEditingMessage] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
   const { user } = useUser();
 
   useEffect(() => {
     loadRooms();
     loadAllVoiceMessages();
-    loadAllDevices();
   }, []);
 
   const loadRooms = () => {
@@ -97,14 +106,6 @@ const AdminPanel: React.FC = () => {
     } catch (error) {
       console.error('Error loading voice messages:', error);
     }
-  };
-
-  const loadAllDevices = () => {
-    getAllDevices((deviceList) => {
-      // Sort devices by last seen (most recent first)
-      const sortedDevices = deviceList.sort((a, b) => b.lastSeen - a.lastSeen);
-      setDevices(sortedDevices);
-    });
   };
 
   const loadRoomMessages = (room: ChatRoom) => {
@@ -199,36 +200,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleAdminEditMessage = async (roomId: string, messageId: string) => {
-    if (editContent.trim() === '') return;
-    
-    try {
-      await adminEditMessage(roomId, messageId, editContent.trim());
-      setEditingMessage(null);
-      setEditContent('');
-      
-      // Refresh messages if this room is currently selected
-      if (selectedRoom?.id === roomId) {
-        loadRoomMessages(selectedRoom);
-      }
-      
-      alert('Message edited successfully!');
-    } catch (error) {
-      console.error('Error editing message:', error);
-      alert('Failed to edit message');
-    }
-  };
-
-  const startEditingMessage = (message: Message) => {
-    setEditingMessage(message.id);
-    setEditContent(message.content);
-  };
-
-  const cancelEditingMessage = () => {
-    setEditingMessage(null);
-    setEditContent('');
-  };
-
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleString();
   };
@@ -300,17 +271,6 @@ const AdminPanel: React.FC = () => {
             >
               <Volume2 className="inline w-5 h-5 mr-2" />
               Voice Messages ({voiceMessages.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('devices')}
-              className={`py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'devices'
-                  ? 'border-red-500 text-red-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              <Monitor className="inline w-5 h-5 mr-2" />
-              Devices ({devices.length})
             </button>
           </nav>
         </div>
@@ -411,60 +371,19 @@ const AdminPanel: React.FC = () => {
                                 {message.type}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              {message.type === MessageType.TEXT && (
-                                <button
-                                  onClick={() => startEditingMessage(message)}
-                                  className="text-blue-400 hover:text-blue-300"
-                                  title="Edit message"
-                                >
-                                  <Edit size={14} />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteMessage(selectedRoom.id, message.id)}
-                                className="text-red-400 hover:text-red-300"
-                                title="Delete message"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => deleteMessage(selectedRoom.id, message.id)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
-                          
-                          {editingMessage === message.id ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={editContent}
-                                onChange={(e) => setEditContent(e.target.value)}
-                                className="w-full px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-blue-400 focus:outline-none resize-none"
-                                rows={3}
-                                placeholder="Edit message content..."
-                              />
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => handleAdminEditMessage(selectedRoom.id, message.id)}
-                                  className="flex items-center space-x-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-                                >
-                                  <Check size={14} />
-                                  <span>Save</span>
-                                </button>
-                                <button
-                                  onClick={cancelEditingMessage}
-                                  className="flex items-center space-x-1 px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
-                                >
-                                  <X size={14} />
-                                  <span>Cancel</span>
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-sm text-gray-300">
-                              {message.type === MessageType.TEXT && message.content}
-                              {message.type === MessageType.IMAGE && '📷 Image'}
-                              {message.type === MessageType.VOICE && '🎤 Voice Message'}
-                              {message.type === MessageType.YOUTUBE && '📺 YouTube Video'}
-                            </div>
-                          )}
+                          <div className="text-sm text-gray-300">
+                            {message.type === MessageType.TEXT && message.content}
+                            {message.type === MessageType.IMAGE && '📷 Image'}
+                            {message.type === MessageType.VOICE && '🎤 Voice Message'}
+                            {message.type === MessageType.YOUTUBE && '📺 YouTube Video'}
+                          </div>
                         </div>
                       ))
                     )}
@@ -555,96 +474,6 @@ const AdminPanel: React.FC = () => {
                         </div>
                       </div>
                     ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'devices' && (
-          <div className="bg-gray-800 rounded-lg p-4">
-            <h2 className="text-xl font-semibold mb-4 text-gray-100">
-              All Devices ({devices.length})
-            </h2>
-            
-            {devices.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <Monitor size={48} className="mx-auto mb-4 opacity-50" />
-                <p>No devices found</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {devices.map((device) => (
-                  <div key={device.fingerprint} className="border border-gray-700 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-blue-600 rounded-lg">
-                          {device.deviceName?.includes('Phone') || device.deviceName?.includes('iPhone') ? (
-                            <Smartphone size={20} className="text-white" />
-                          ) : (
-                            <Monitor size={20} className="text-white" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-medium text-blue-400">
-                            {device.deviceName || 'Unknown Device'}
-                          </h3>
-                          <p className="text-sm text-gray-400">
-                            ID: {device.fingerprint}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm text-gray-400">
-                        <p>Last Seen: {formatTime(device.lastSeen)}</p>
-                        <p>First Visit: {formatTime(device.firstVisit)}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-gray-300">Device Info</h4>
-                        <div className="text-xs text-gray-400 space-y-1">
-                          <p><strong>Language:</strong> {device.language}</p>
-                          <p><strong>Screen:</strong> {device.screenResolution}</p>
-                          <p><strong>Timezone:</strong> {device.timezone}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-gray-300">Browser Info</h4>
-                        <div className="text-xs text-gray-400">
-                          <p className="truncate" title={device.userAgent}>
-                            {device.userAgent?.substring(0, 60)}...
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {device.roomVisits && Object.keys(device.roomVisits).length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center">
-                          <MapPin size={16} className="mr-2" />
-                          Room Visits ({Object.keys(device.roomVisits).length} rooms)
-                        </h4>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {Object.entries(device.roomVisits).map(([roomId, roomData]: [string, any]) => (
-                            <div key={roomId} className="bg-gray-700 p-2 rounded">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-green-400 font-medium">
-                                  {roomData.roomName}
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  {roomData.visits?.length || 0} visits
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                Last visit: {formatTime(Math.max(...(roomData.visits || [0])))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

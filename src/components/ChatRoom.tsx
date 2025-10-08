@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getMessages, getTypingIndicators } from '../services/firebase';
-import { updateDeviceActivity } from '../services/firebase';
 import { useUser } from '../contexts/UserContext';
-import { saveRoom, removeSavedRoom, isRoomSaved, trackRoomVisit, getDeviceInfo } from '../utils/storage';
+import { saveRoom, removeSavedRoom, isRoomSaved } from '../utils/storage';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import TypingIndicator from './TypingIndicator';
@@ -32,17 +31,6 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, roomName, isPrivate, passwo
   useEffect(() => {
     setLoading(true);
     setSaved(isRoomSaved(roomId));
-    
-    // Track room visit locally
-    trackRoomVisit(roomId, roomName);
-    
-    // Update device activity in Firebase
-    const deviceInfo = getDeviceInfo();
-    if (deviceInfo) {
-      updateDeviceActivity(deviceInfo.fingerprint, roomId, roomName).catch(error => {
-        console.error('Error updating device activity:', error);
-      });
-    }
     
     const unsubscribe = getMessages(roomId, (messageList) => {
       const sortedMessages = [...messageList].sort((a, b) => a.timestamp - b.timestamp);

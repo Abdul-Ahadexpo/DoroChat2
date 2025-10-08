@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import { getDatabase, ref, set, push, onValue, remove, update, get, serverTimestamp } from 'firebase/database';
 
 const firebaseConfig = {
@@ -13,7 +12,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
 export const database = getDatabase(app);
 
 export const createChatRoom = async (roomData: {
@@ -108,15 +106,6 @@ export const editMessage = async (roomId: string, messageId: string, newContent:
   });
 };
 
-export const adminEditMessage = async (roomId: string, messageId: string, newContent: string) => {
-  const messageRef = ref(database, `messages/${roomId}/${messageId}`);
-  
-  // Admin edit doesn't add editedAt timestamp to hide the edit indicator
-  await update(messageRef, {
-    content: newContent,
-  });
-};
-
 export const deleteMessage = async (roomId: string, messageId: string) => {
   const messageRef = ref(database, `messages/${roomId}/${messageId}`);
   await remove(messageRef);
@@ -187,12 +176,9 @@ export const getTypingIndicators = (roomId: string, callback: (typing: any[]) =>
 };
 
 // Read receipts
-export const markMessageAsSeen = async (roomId: string, messageId: string, userId: string, userName?: string) => {
+export const markMessageAsSeen = async (roomId: string, messageId: string, userId: string) => {
   const seenRef = ref(database, `messages/${roomId}/${messageId}/seenBy/${userId}`);
-  await set(seenRef, {
-    timestamp: Date.now(),
-    userName: userName || userId
-  });
+  await set(seenRef, serverTimestamp());
 };
 
 export const getLastSeenMessage = (roomId: string, callback: (lastSeen: any) => void) => {
@@ -250,20 +236,6 @@ export const removeUserStatus = async (userId: string) => {
   await remove(statusRef);
 };
 
-// Message reactions
-export const addReaction = async (roomId: string, messageId: string, emoji: string, userId: string, userName: string) => {
-  const reactionRef = ref(database, `messages/${roomId}/${messageId}/reactions/${emoji}/${userId}`);
-  await set(reactionRef, {
-    userName,
-    timestamp: serverTimestamp(),
-  });
-};
-
-export const removeReaction = async (roomId: string, messageId: string, emoji: string, userId: string) => {
-  const reactionRef = ref(database, `messages/${roomId}/${messageId}/reactions/${emoji}/${userId}`);
-  await remove(reactionRef);
-};
-
 // Live YouTube video functions
 export const setLiveVideoState = async (roomId: string, videoState: LiveVideoState) => {
   const liveVideoRef = ref(database, `liveVideos/${roomId}`);
@@ -285,54 +257,6 @@ export const getLiveVideoState = (roomId: string, callback: (state: LiveVideoSta
 export const removeLiveVideoState = async (roomId: string) => {
   const liveVideoRef = ref(database, `liveVideos/${roomId}`);
   await remove(liveVideoRef);
-};
-
-// Device tracking functions
-export const registerDevice = async (deviceData: any) => {
-  const devicesRef = ref(database, `devices/${deviceData.fingerprint}`);
-  await set(devicesRef, {
-    ...deviceData,
-    lastSeen: serverTimestamp(),
-  });
-};
-
-export const updateDeviceActivity = async (fingerprint: string, roomId: string, roomName: string) => {
-  const deviceRef = ref(database, `devices/${fingerprint}`);
-  const snapshot = await get(deviceRef);
-  
-  if (snapshot.exists()) {
-    const deviceData = snapshot.val();
-    const roomVisits = deviceData.roomVisits || {};
-    
-    if (!roomVisits[roomId]) {
-      roomVisits[roomId] = {
-        roomName,
-        visits: []
-      };
-    }
-    
-    roomVisits[roomId].visits.push(Date.now());
-    roomVisits[roomId].roomName = roomName;
-    
-    await update(deviceRef, {
-      roomVisits,
-      lastSeen: serverTimestamp(),
-    });
-  }
-};
-
-export const getAllDevices = (callback: (devices: any[]) => void) => {
-  const devicesRef = ref(database, 'devices');
-  
-  onValue(devicesRef, (snapshot) => {
-    const data = snapshot.val();
-    const devices = data ? Object.entries(data).map(([fingerprint, device]) => ({
-      fingerprint,
-      ...device as object
-    })) : [];
-    
-    callback(devices);
-  });
 };
 
 export default {
@@ -359,7 +283,4 @@ export default {
   setLiveVideoState,
   getLiveVideoState,
   removeLiveVideoState,
-  registerDevice,
-  updateDeviceActivity,
-  getAllDevices,
 };

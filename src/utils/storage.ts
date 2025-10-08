@@ -12,8 +12,6 @@ const CHAT_SETTINGS_KEY = 'doro-chat-chat-settings';
 const PRIVACY_SETTINGS_KEY = 'doro-chat-privacy-settings';
 const BLOCKED_USERS_KEY = 'doro-chat-blocked-users';
 const CUSTOM_STATUS_KEY = 'doro-chat-custom-status';
-const DEVICE_INFO_KEY = 'doro-chat-device-info';
-const ROOM_VISITS_KEY = 'doro-chat-room-visits';
 
 // Generate a random user ID if one doesn't exist
 export const getUserId = (): string => {
@@ -236,102 +234,6 @@ export const setCustomStatus = (status: any, userId?: string): void => {
   localStorage.setItem(key, JSON.stringify(status));
 };
 
-// Device tracking
-export const getDeviceInfo = () => {
-  const deviceInfo = localStorage.getItem(DEVICE_INFO_KEY);
-  return deviceInfo ? JSON.parse(deviceInfo) : null;
-};
-
-export const setDeviceInfo = (deviceInfo: any): void => {
-  localStorage.setItem(DEVICE_INFO_KEY, JSON.stringify(deviceInfo));
-};
-
-export const generateDeviceFingerprint = (): string => {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx!.textBaseline = 'top';
-  ctx!.font = '14px Arial';
-  ctx!.fillText('Device fingerprint', 2, 2);
-  
-  const fingerprint = [
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    new Date().getTimezoneOffset(),
-    canvas.toDataURL()
-  ].join('|');
-  
-  // Simple hash function
-  let hash = 0;
-  for (let i = 0; i < fingerprint.length; i++) {
-    const char = fingerprint.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  
-  return Math.abs(hash).toString(36);
-};
-
-export const getDeviceName = (): string => {
-  const userAgent = navigator.userAgent;
-  let deviceName = 'Unknown Device';
-  
-  // Detect device type and browser
-  if (/iPhone/i.test(userAgent)) {
-    deviceName = 'iPhone';
-  } else if (/iPad/i.test(userAgent)) {
-    deviceName = 'iPad';
-  } else if (/Android/i.test(userAgent)) {
-    if (/Mobile/i.test(userAgent)) {
-      deviceName = 'Android Phone';
-    } else {
-      deviceName = 'Android Tablet';
-    }
-  } else if (/Windows/i.test(userAgent)) {
-    deviceName = 'Windows PC';
-  } else if (/Macintosh/i.test(userAgent)) {
-    deviceName = 'Mac';
-  } else if (/Linux/i.test(userAgent)) {
-    deviceName = 'Linux PC';
-  }
-  
-  // Add browser info
-  if (/Chrome/i.test(userAgent) && !/Edge/i.test(userAgent)) {
-    deviceName += ' (Chrome)';
-  } else if (/Firefox/i.test(userAgent)) {
-    deviceName += ' (Firefox)';
-  } else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) {
-    deviceName += ' (Safari)';
-  } else if (/Edge/i.test(userAgent)) {
-    deviceName += ' (Edge)';
-  }
-  
-  return deviceName;
-};
-
-// Room visits tracking
-export const trackRoomVisit = (roomId: string, roomName: string): void => {
-  const visits = getRoomVisits();
-  const timestamp = Date.now();
-  
-  if (!visits[roomId]) {
-    visits[roomId] = {
-      roomName,
-      visits: []
-    };
-  }
-  
-  visits[roomId].visits.push(timestamp);
-  visits[roomId].roomName = roomName; // Update room name in case it changed
-  
-  localStorage.setItem(ROOM_VISITS_KEY, JSON.stringify(visits));
-};
-
-export const getRoomVisits = () => {
-  const visits = localStorage.getItem(ROOM_VISITS_KEY);
-  return visits ? JSON.parse(visits) : {};
-};
-
 export default {
   getUserId,
   getUserName,
@@ -363,10 +265,4 @@ export default {
   isUserBlocked,
   getCustomStatus,
   setCustomStatus,
-  getDeviceInfo,
-  setDeviceInfo,
-  generateDeviceFingerprint,
-  getDeviceName,
-  trackRoomVisit,
-  getRoomVisits,
 };

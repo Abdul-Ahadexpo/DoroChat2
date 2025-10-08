@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import storage from '../utils/storage';
-import { registerDevice, updateDeviceActivity } from '../services/firebase';
 import { User } from '../utils/types';
 
 interface UserContextType {
@@ -20,37 +19,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Load user data from localStorage on initial render
   useEffect(() => {
-    // Initialize device tracking
-    const initializeDevice = async () => {
-      let deviceInfo = storage.getDeviceInfo();
-      
-      if (!deviceInfo) {
-        const fingerprint = storage.generateDeviceFingerprint();
-        const deviceName = storage.getDeviceName();
-        
-        deviceInfo = {
-          fingerprint,
-          deviceName,
-          userAgent: navigator.userAgent,
-          language: navigator.language,
-          screenResolution: `${screen.width}x${screen.height}`,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          firstVisit: Date.now(),
-        };
-        
-        storage.setDeviceInfo(deviceInfo);
-        
-        // Register device in Firebase
-        try {
-          await registerDevice(deviceInfo);
-        } catch (error) {
-          console.error('Error registering device:', error);
-        }
-      }
-    };
-    
-    initializeDevice();
-    
     const loadedUser: User = {
       id: storage.getUserId(),
       name: storage.getUserName(),
