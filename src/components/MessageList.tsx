@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Message, MessageType } from '../utils/types';
 import { useUser } from '../contexts/UserContext';
-import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage, getAllUserStatuses } from '../services/firebase';
+import { editMessage, deleteMessage, markMessageAsSeen, updateLastSeenMessage, getAllUserStatuses, addReaction, removeReaction } from '../services/firebase';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import VoiceNotePlayer from './VoiceNotePlayer';
@@ -9,7 +9,8 @@ import ImageMessage from './ImageMessage';
 import YouTubeEmbed from './YouTubeEmbed';
 import { notificationManager } from '../utils/notifications';
 import { getNotificationSettings } from '../utils/storage';
-import { Reply, Edit, Trash2, MoreVertical, Check, X } from 'lucide-react';
+import { Reply, CreditCard as Edit, Trash2, MoreVertical, Check, X, Smile, Heart } from 'lucide-react';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 
 interface MessageListProps {
   messages: Message[];
@@ -25,6 +26,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   const [editContent, setEditContent] = useState('');
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [userStatuses, setUserStatuses] = useState<{ [userId: string]: any }>({});
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const { user } = useUser();
 
   // Initialize notifications
@@ -182,6 +185,62 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     setShowStatusModal({ show: false, status: null, userName: '', profileImage: '' });
   };
 
+  // Quick reaction emojis for mobile
+  const quickReactions = ['❤️', '👍', '😂', '😮', '😢', '😡'];
+
+  const handleQuickReaction = async (messageId: string, emoji: string) => {
+    try {
+      // Check if user already reacted with this emoji
+      const message = messages.find(m => m.id === messageId);
+      const userAlreadyReacted = message?.reactions?.[emoji]?.[user.id];
+      
+      if (userAlreadyReacted) {
+        await removeReaction(roomId, messageId, emoji, user.id);
+      } else {
+        await addReaction(roomId, messageId, emoji, user.id, user.name);
+      }
+      
+      setShowReactionPicker(null);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
+  const handleEmojiPickerReaction = async (messageId: string, emojiData: EmojiClickData) => {
+    try {
+      const emoji = emojiData.emoji;
+      
+      // Check if user already reacted with this emoji
+      const message = messages.find(m => m.id === messageId);
+      const userAlreadyReacted = message?.reactions?.[emoji]?.[user.id];
+      
+      if (userAlreadyReacted) {
+        await removeReaction(roomId, messageId, emoji, user.id);
+      } else {
+        await addReaction(roomId, messageId, emoji, user.id, user.name);
+      }
+      
+      setShowEmojiPicker(null);
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    try {
+      const message = messages.find(m => m.id === messageId);
+      const userAlreadyReacted = message?.reactions?.[emoji]?.[user.id];
+      
+      if (userAlreadyReacted) {
+        await removeReaction(roomId, messageId, emoji, user.id);
+      } else {
+        await addReaction(roomId, messageId, emoji, user.id, user.name);
+      }
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+    }
+  };
+
   const ProfileImage: React.FC<{ 
     src?: string; 
     name: string; 
@@ -300,6 +359,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     <Reply size={14} />
                   </button>
                   
+                  <button
+                    onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
+                    className="text-gray-500 hover:text-violet-600 dark:text-gray-400 dark:hover:text-violet-400 p-1"
+                    aria-label="Add reaction"
+                  >
+                    <Smile size={14} />
+                  </button>
+                  
                   {message.senderId === user.id && (
                     <div className="relative">
                       <button
@@ -414,6 +481,97 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                 )}
               </div>
               
+              {/* Reaction Picker */}
+              {showReactionPicker === message.id && (
+                <div className="relative mt-2 ml-8">
+                  {/* Mobile: Quick reactions */}
+                  <div className="md:hidden">
+                    <div className="flex flex-wrap gap-2 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                      {quickReactions.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => handleQuickReaction(message.id, emoji)}
+                          className="text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPicker(message.id);
+                          setShowReactionPicker(null);
+                        }}
+                        className="text-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-400"
+                      >
+                        ➕
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Desktop: Full emoji picker */}
+                  <div className="hidden md:block">
+                    <div className="absolute bottom-full left-0 mb-2 z-50">
+                      <EmojiPicker 
+                        onEmojiClick={(emojiData) => handleEmojiPickerReaction(message.id, emojiData)}
+                        width={300}
+                        height={400}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Mobile Emoji Picker */}
+              {showEmojiPicker === message.id && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 md:hidden">
+                  <div className="bg-white dark:bg-gray-800 rounded-t-lg w-full max-h-96 overflow-hidden">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                      <h3 className="font-medium text-gray-900 dark:text-white">Choose Reaction</h3>
+                      <button
+                        onClick={() => setShowEmojiPicker(null)}
+                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto">
+                      <EmojiPicker 
+                        onEmojiClick={(emojiData) => handleEmojiPickerReaction(message.id, emojiData)}
+                        width="100%"
+                        height={300}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Display Reactions */}
+              {message.reactions && Object.keys(message.reactions).length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2 ml-8">
+                  {Object.entries(message.reactions).map(([emoji, users]) => {
+                    const userCount = Object.keys(users).length;
+                    const userReacted = users[user.id];
+                    const userNames = Object.values(users).map((u: any) => u.userName).join(', ');
+                    
+                    return (
+                      <button
+                        key={emoji}
+                        onClick={() => toggleReaction(message.id, emoji)}
+                        className={`flex items-center space-x-1 px-2 py-1 rounded-full text-sm transition-all duration-200 hover:scale-105 ${
+                          userReacted
+                            ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 ring-1 ring-violet-300 dark:ring-violet-700'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                        title={`${userNames} reacted with ${emoji}`}
+                      >
+                        <span>{emoji}</span>
+                        <span className="font-medium">{userCount}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              
               {/* Read receipts for sender's messages */}
               {message.senderId === user.id && getSeenCount(message) > 0 && (
                 <div className="text-xs text-gray-400 dark:text-gray-500 ml-8 mt-1">
@@ -440,6 +598,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
+      )}
+      
+      {/* Click outside to close pickers */}
+      {(showReactionPicker || showEmojiPicker) && (
+        <div 
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setShowReactionPicker(null);
+            setShowEmojiPicker(null);
+          }}
+        />
       )}
       
       {/* Custom Status Modal */}
