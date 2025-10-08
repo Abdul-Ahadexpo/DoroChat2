@@ -27,11 +27,58 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     scrollToBottom();
     
     // Mark visible messages as seen
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.senderId !== user?.id) {
-        markMessageAsSeen(roomId, lastMessage.id, user?.id || '').catch(console.error);
-      }
+    if (messages.length > 0 && user?.id) {
+      // Mark all visible messages as seen (not sent by current user)
+      messages.forEach(message => {
+        if (message.senderId !== user.id) {
+          markMessageAsSeen(roomId, message.id, user.id).catch(console.error);
+        }
+      });
+    }
+  }, [messages, roomId, user?.id]);
+
+  const getSeenByText = (message: Message) => {
+    if (!message.seenBy || message.senderId !== user?.id) return null;
+    
+    const seenUsers = Object.keys(message.seenBy).filter(userId => userId !== message.senderId);
+    if (seenUsers.length === 0) return null;
+    
+    if (seenUsers.length === 1) {
+      return "Seen";
+    } else {
+      return `Seen by ${seenUsers.length}`;
+    }
+  };
+
+  const getSeenByDetails = (message: Message) => {
+    if (!message.seenBy || message.senderId !== user?.id) return null;
+    
+    const seenEntries = Object.entries(message.seenBy)
+      .filter(([userId]) => userId !== message.senderId)
+      .map(([userId, timestamp]) => ({ userId, timestamp: timestamp as number }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (seenEntries.length === 0) return null;
+    
+    return seenEntries.map(entry => ({
+      userId: entry.userId,
+      time: new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+  };
+
+  const [showSeenDetails, setShowSeenDetails] = useState<string | null>(null);
+
+  useEffect(() => {
+    scrollToBottom();
+    
+    // Mark visible messages as seen
+    if (messages.length > 0 && user?.id) {
+      // Mark all visible messages as seen (not sent by current user)
+      messages.forEach(message => {
+        if (message.senderId !== user.id) {
+          markMessageAsSeen(roomId, message.id, user.id).catch(console.error);
+        }
+      });
     }
   }, [messages]);
 
@@ -115,19 +162,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     }
 
     return <span>{message.content}</span>;
-  };
-
-  const getSeenByText = (message: Message) => {
-    if (!message.seenBy || message.senderId === user?.id) return null;
-    
-    const seenUsers = Object.keys(message.seenBy).filter(userId => userId !== message.senderId);
-    if (seenUsers.length === 0) return null;
-    
-    if (seenUsers.length === 1) {
-      return "Seen";
-    } else {
-      return `Seen by ${seenUsers.length}`;
-    }
   };
 
   return (
@@ -221,6 +255,19 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Seen Details Popup */}
+            {showSeenDetails === message.id && getSeenByDetails(message) && (
+              <div className="absolute bottom-full left-0 mb-2 bg-gray-900 text-white text-xs rounded-lg p-2 shadow-lg z-20 min-w-32">
+                <div className="font-semibold mb-1">Seen by:</div>
+                {getSeenByDetails(message)?.map((seen, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span>{seen.userId}</span>
+                    <span className="ml-2 opacity-75">{seen.time}</span>
+                  </div>
+                ))}
               </div>
             )}
 
