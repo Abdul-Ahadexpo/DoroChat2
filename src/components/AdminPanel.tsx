@@ -5,7 +5,8 @@ import {
   getMessages, 
   deleteMessage, 
   deleteRoom,
-  database 
+  database,
+  getAllDevices
 } from '../services/firebase';
 import { ref, remove, get } from 'firebase/database';
 import { ChatRoom, Message, MessageType } from '../utils/types';
@@ -23,7 +24,10 @@ import {
   Users,
   Calendar,
   Clock,
-  User
+  User,
+  Monitor,
+  Smartphone,
+  MapPin
 } from 'lucide-react';
 
 interface VoiceMessage {
@@ -42,7 +46,8 @@ const AdminPanel: React.FC = () => {
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [roomMessages, setRoomMessages] = useState<Message[]>([]);
   const [voiceMessages, setVoiceMessages] = useState<VoiceMessage[]>([]);
-  const [activeTab, setActiveTab] = useState<'rooms' | 'voices'>('rooms');
+  const [devices, setDevices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'rooms' | 'voices' | 'devices'>('rooms');
   const [loading, setLoading] = useState(true);
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const [audioElements, setAudioElements] = useState<{ [key: string]: HTMLAudioElement }>({});
@@ -51,6 +56,7 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     loadRooms();
     loadAllVoiceMessages();
+    loadAllDevices();
   }, []);
 
   const loadRooms = () => {
@@ -106,6 +112,14 @@ const AdminPanel: React.FC = () => {
     } catch (error) {
       console.error('Error loading voice messages:', error);
     }
+  };
+
+  const loadAllDevices = () => {
+    getAllDevices((deviceList) => {
+      // Sort devices by last seen (most recent first)
+      const sortedDevices = deviceList.sort((a, b) => b.lastSeen - a.lastSeen);
+      setDevices(sortedDevices);
+    });
   };
 
   const loadRoomMessages = (room: ChatRoom) => {
@@ -271,6 +285,17 @@ const AdminPanel: React.FC = () => {
             >
               <Volume2 className="inline w-5 h-5 mr-2" />
               Voice Messages ({voiceMessages.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('devices')}
+              className={`py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'devices'
+                  ? 'border-red-500 text-red-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Monitor className="inline w-5 h-5 mr-2" />
+              Devices ({devices.length})
             </button>
           </nav>
         </div>
@@ -474,6 +499,96 @@ const AdminPanel: React.FC = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'devices' && (
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h2 className="text-xl font-semibold mb-4 text-gray-100">
+              All Devices ({devices.length})
+            </h2>
+            
+            {devices.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <Monitor size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No devices found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {devices.map((device) => (
+                  <div key={device.fingerprint} className="border border-gray-700 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-blue-600 rounded-lg">
+                          {device.deviceName?.includes('Phone') || device.deviceName?.includes('iPhone') ? (
+                            <Smartphone size={20} className="text-white" />
+                          ) : (
+                            <Monitor size={20} className="text-white" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-blue-400">
+                            {device.deviceName || 'Unknown Device'}
+                          </h3>
+                          <p className="text-sm text-gray-400">
+                            ID: {device.fingerprint}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-gray-400">
+                        <p>Last Seen: {formatTime(device.lastSeen)}</p>
+                        <p>First Visit: {formatTime(device.firstVisit)}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-300">Device Info</h4>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <p><strong>Language:</strong> {device.language}</p>
+                          <p><strong>Screen:</strong> {device.screenResolution}</p>
+                          <p><strong>Timezone:</strong> {device.timezone}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium text-gray-300">Browser Info</h4>
+                        <div className="text-xs text-gray-400">
+                          <p className="truncate" title={device.userAgent}>
+                            {device.userAgent?.substring(0, 60)}...
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {device.roomVisits && Object.keys(device.roomVisits).length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-300 mb-2 flex items-center">
+                          <MapPin size={16} className="mr-2" />
+                          Room Visits ({Object.keys(device.roomVisits).length} rooms)
+                        </h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {Object.entries(device.roomVisits).map(([roomId, roomData]: [string, any]) => (
+                            <div key={roomId} className="bg-gray-700 p-2 rounded">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-green-400 font-medium">
+                                  {roomData.roomName}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  {roomData.visits?.length || 0} visits
+                                </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Last visit: {formatTime(Math.max(...(roomData.visits || [0])))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
