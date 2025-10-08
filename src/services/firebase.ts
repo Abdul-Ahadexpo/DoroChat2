@@ -187,9 +187,12 @@ export const getTypingIndicators = (roomId: string, callback: (typing: any[]) =>
 };
 
 // Read receipts
-export const markMessageAsSeen = async (roomId: string, messageId: string, userId: string) => {
+export const markMessageAsSeen = async (roomId: string, messageId: string, userId: string, userName?: string) => {
   const seenRef = ref(database, `messages/${roomId}/${messageId}/seenBy/${userId}`);
-  await set(seenRef, Date.now());
+  await set(seenRef, {
+    timestamp: Date.now(),
+    userName: userName || userId
+  });
 };
 
 export const getLastSeenMessage = (roomId: string, callback: (lastSeen: any) => void) => {
