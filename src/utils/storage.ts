@@ -166,7 +166,7 @@ export const getChatSettings = () => {
     showTimestamps: true,
     showReadReceipts: true,
     showTypingIndicators: true,
-    autoScroll: true,
+    autoScroll: false,
     compactMode: false,
     showProfilePictures: true,
     messagePreview: true,

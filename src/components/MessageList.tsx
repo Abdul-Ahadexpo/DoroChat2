@@ -20,7 +20,8 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -85,12 +86,30 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
     });
   }, []);
 
-  useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, autoScroll]);
 
+
+
+
+
+
+
+
+
+
+  
+  // useEffect(() => {
+  //   if (autoScroll && messagesEndRef.current) {
+  //     messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  //   }
+  // }, [messages, autoScroll]);
+
+
+
+
+
+
+
+  
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -186,7 +205,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
   };
 
   // Quick reaction emojis for mobile
-  const quickReactions = ['❤️', '👍', '😂', '😮', '😢', '😡'];
+  const quickReactions = ['❤️', '👍', '😂', '😮', '😢', '🙂'];
 
   const handleQuickReaction = async (messageId: string, emoji: string) => {
     try {
@@ -589,7 +608,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, roomId, onReply }) 
         <button
           onClick={() => {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            setAutoScroll(true);
+            setAutoScroll(false);
           }}
           className="fixed bottom-20 md:bottom-24 right-4 md:right-8 bg-violet-600 text-white rounded-full p-2 md:p-3 shadow-lg hover:bg-violet-700 transition-colors z-10"
           aria-label="Scroll to bottom"
